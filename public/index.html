@@ -7,198 +7,363 @@
 <meta name="description" content="Plateforme numérique d'Abengourou : produits, immobilier, emplois, concours, transport, restaurants et plus." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
 
-<!-- ===== 1. BARRE SUPÉRIEURE ===== -->
-<header>
-  <div class="topbar">
-    <button class="menu-btn" id="menuBtn" title="Menu">☰</button>
-    <a href="#" class="logo" onclick="showHome();return false;">ABENGOUROU-MARKET</a>
-    <div class="search">
-      <input id="searchInput" placeholder="Rechercher un produit, un emploi, un terrain, une moto…" />
-      <button onclick="doSearch()">🔍</button>
+<!-- TOP STRIP -->
+<div class="top-strip">
+  <div class="container top-strip-inner">
+    <span>📍 Abengourou, Côte d'Ivoire &nbsp;|&nbsp; 🕐 Lun–Sam 08h–18h &nbsp;|&nbsp; 📞 +225 XX XX XX XX XX</span>
+    <div class="top-strip-right">
+      <a href="#" onclick="showText('apropos');return false">À propos</a>
+      <a href="#" onclick="showText('contact');return false">Contact</a>
+      <a href="#" onclick="showText('pub');return false">Publicité</a>
     </div>
-    <button class="icon-btn" onclick="openAccount()" title="Mon compte">👤</button>
-    <button class="icon-btn" onclick="alert('Favoris à venir')" title="Favoris">❤️</button>
-    <button class="icon-btn" onclick="openCart()" title="Panier">🛒 <span class="badge" id="cartCount">0</span></button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header id="mainHeader">
+  <div class="container header-inner">
+    <a href="#" class="logo-wrap" onclick="showHome();return false;">
+      <img src="/img/logo.png" alt="ABENGOUROU-MARKET" class="logo-img" />
+    </a>
+    <div class="search-wrap">
+      <select class="search-cat-sel" id="searchCat">
+        <option value="">Toutes catégories</option>
+        <option value="immobilier">Immobilier</option>
+        <option value="vehicules">Véhicules</option>
+        <option value="telephones">Téléphones</option>
+        <option value="mode">Mode</option>
+        <option value="emploi">Emploi</option>
+        <option value="services">Services</option>
+      </select>
+      <input id="searchInput" placeholder="Chercher un produit, emploi, terrain…" autocomplete="off" />
+      <button class="search-btn" onclick="doSearch()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+    </div>
+    <div class="header-actions">
+      <button class="hbtn" onclick="openAccount()">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="hbtn-lbl">Mon compte</span>
+      </button>
+      <button class="hbtn cart-btn" onclick="openCart()">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="hbtn-lbl">Panier</span>
+        <span class="cart-badge" id="cartCount">0</span>
+      </button>
+      <button class="hbtn menu-btn-mob" id="menuBtn">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
   </div>
   <div class="flag-bar"></div>
 </header>
+
+<!-- NAV CATS (desktop) -->
+<nav class="cat-nav" id="catNav">
+  <div class="container cat-nav-inner">
+    <button class="cat-nav-all" id="menuBtn2">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      Toutes les catégories
+    </button>
+    <div class="cat-nav-links" id="catNavLinks"></div>
+  </div>
+</nav>
 
 <!-- mobile sidebar overlay -->
 <div class="mobile-sidebar" id="mobileSidebar" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="panel" id="mobileSidebarPanel"></div>
 </div>
 
-<main class="container">
+<main>
 
 <!-- ===== HOME ===== -->
 <div id="page-home" class="page-view active">
-<div class="layout">
+<div class="container home-layout">
 
-  <!-- ===== 2. MENU LATÉRAL ===== -->
+  <!-- LEFT SIDEBAR -->
   <aside class="sidebar" id="desktopSidebar"></aside>
 
-  <div>
-    <!-- ===== 3. BANNIÈRE ===== -->
-    <div class="hero">
-      <h1>Bienvenue sur ABENGOUROU-MARKET</h1>
-      <p>Promotions du mois · Terrains à vendre · Emplois disponibles · Concours ouverts · Événements de la ville · Offres de restaurants</p>
+  <div class="home-main">
+    <!-- HERO BANNER CAROUSEL -->
+    <div class="hero-carousel" id="heroCarousel">
+      <div class="carousel-track" id="carouselTrack"></div>
+      <button class="car-btn car-prev" onclick="carMove(-1)">&#8249;</button>
+      <button class="car-btn car-next" onclick="carMove(1)">&#8250;</button>
+      <div class="car-dots" id="carDots"></div>
     </div>
 
-    <!-- ===== 4. RACCOURCIS ===== -->
-    <div class="shortcuts" id="shortcuts"></div>
-
-    <!-- ===== 5. OFFRES FLASH ===== -->
-    <div class="flash-head">
-      <h2>⚡ Offres Flash</h2><a href="#" onclick="return false">Voir tout →</a>
+    <!-- CATEGORY SHORTCUTS -->
+    <div class="shortcuts-wrap">
+      <div class="shortcuts" id="shortcuts"></div>
     </div>
-    <div class="grid-2" id="flashGrid" style="margin-top:12px"></div>
 
-    <!-- ===== BOUTIQUE (articles vendeurs/admin) ===== -->
-    <section class="block">
-      <div class="section-head"><h2>🛍️ Boutique</h2></div>
-      <div class="grid-3" id="shopGrid"></div>
+    <!-- BOUTIQUE -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>🛍️ Boutique en ligne</h2>
+        <a href="#" class="see-all" onclick="return false">Voir tout →</a>
+      </div>
+      <div class="products-grid" id="shopGrid">
+        <div class="loading-placeholder"><div class="spinner"></div><p>Chargement…</p></div>
+      </div>
     </section>
 
-    <!-- ===== 6. CONCOURS-CI ===== -->
-    <section class="block">
-      <div class="section-head"><h2>🎓 Derniers Concours CI</h2><a href="#" onclick="return false">Voir tous les concours</a></div>
-      <div class="grid-3" id="concoursGrid"></div>
+    <!-- CONCOURS -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>🎓 Concours CI</h2>
+        <a href="#" class="see-all" onclick="return false">Voir tous →</a>
+      </div>
+      <div class="tiles-grid" id="concoursGrid"></div>
     </section>
 
-    <!-- ===== 7. EMPLOI ===== -->
-    <section class="block">
-      <div class="section-head"><h2>💼 Dernières offres d'emploi</h2><a href="#" onclick="return false">Toutes les offres</a></div>
-      <div class="grid-3" id="jobsGrid"></div>
+    <!-- EMPLOI -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>💼 Offres d'emploi</h2>
+        <a href="#" class="see-all" onclick="return false">Voir tout →</a>
+      </div>
+      <div class="tiles-grid" id="jobsGrid"></div>
     </section>
 
-    <!-- ===== 8. IMMOBILIER ===== -->
-    <section class="block">
-      <div class="section-head"><h2>🏠 Immobilier</h2><a href="#" onclick="return false">Voir plus</a></div>
-      <div class="grid-3" id="realGrid"></div>
+    <!-- IMMOBILIER -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>🏠 Immobilier</h2>
+        <a href="#" class="see-all" onclick="return false">Voir plus →</a>
+      </div>
+      <div class="products-grid" id="realGrid"></div>
     </section>
 
-    <!-- ===== 9. TRANSPORT ===== -->
-    <section class="block">
-      <div class="section-head"><h2>🚕 Transport</h2></div>
-      <div class="grid-3" id="transportGrid"></div>
+    <!-- TRANSPORT -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>🚕 Transport &amp; Taxi</h2>
+      </div>
+      <div class="transport-grid" id="transportGrid"></div>
     </section>
 
-    <!-- ===== 10. RESTAURANTS ===== -->
-    <section class="block">
-      <div class="section-head"><h2>🍽️ Restaurants & Livraison</h2><a href="#" onclick="return false">Tous les restaurants</a></div>
-      <div class="grid-3" id="restoGrid"></div>
+    <!-- RESTAURANTS -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>🍽️ Restaurants &amp; Livraison</h2>
+        <a href="#" class="see-all" onclick="return false">Voir plus →</a>
+      </div>
+      <div class="products-grid" id="restoGrid"></div>
     </section>
 
-    <!-- ===== 11. ACTUALITÉS ABENGOUROU ===== -->
-    <section class="block">
-      <div class="section-head"><h2>📰 Actualités Abengourou</h2><a href="#" onclick="return false">Toute l'actu</a></div>
+    <!-- ACTUALITES -->
+    <section class="section-block">
+      <div class="section-head">
+        <h2>📰 Actualités Abengourou</h2>
+        <a href="#" class="see-all" onclick="return false">Toute l'actu →</a>
+      </div>
       <ul class="news-list" id="newsList"></ul>
     </section>
   </div>
 </div>
 </div>
 
-<!-- ===== ABOUT / COND / CONF / CONTACT / PUB pages ===== -->
+<!-- TEXT PAGE -->
 <div id="page-text" class="page-view">
-  <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
-  <section class="block" id="textBody"></section>
+  <div class="container">
+    <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+    <section class="section-block" id="textBody"></section>
+  </div>
 </div>
 
-<!-- ===== VENDEUR DASHBOARD ===== -->
+<!-- CATEGORY PAGE -->
+<div id="page-category" class="page-view">
+  <div class="container">
+    <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+    <div id="catPageContent"></div>
+  </div>
+</div>
+
+<!-- VENDEUR DASHBOARD -->
 <div id="page-vendeur" class="page-view">
-  <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
-  <section class="block">
-    <h2>Espace Vendeur</h2>
-    <p style="color:var(--muted);font-size:13px;margin:8px 0">Ajoutez un article (sera validé par l'administrateur).</p>
-    <div id="subBanner" style="margin:8px 0"></div>
-    <form id="productForm">
-      <label>Titre de l'article</label><input name="title" required />
-      <label>Catégorie</label>
-      <select name="category" required id="catSelect"></select>
-      <label>Prix (FCFA)</label><input name="price" type="number" required />
-      <label>Ancien prix (optionnel)</label><input name="oldPrice" type="number" />
-      <label>Stock disponible</label><input name="stock" type="number" required />
-      <label>Numéro WhatsApp (contact client)</label><input name="whatsapp" placeholder="Ex : 2250700000000" required />
-      <label>Numéro personnel (réception SMS commande)</label><input name="personalPhone" placeholder="Ex : 2250700000000" required />
-      <label>Image de l'article</label><input name="image" type="file" accept="image/*" />
-      <label>Description</label><textarea name="description" rows="3"></textarea>
-      <div class="row"><button type="submit" class="btn btn-primary">Publier l'article</button></div>
-    </form>
-    <h3 style="margin-top:20px">Mes articles</h3>
-    <div id="myProducts" style="margin-top:10px"></div>
-  </section>
+  <div class="container">
+    <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+    <div class="dashboard-grid">
+      <div class="section-block">
+        <div class="dash-header">
+          <h2>Espace Vendeur</h2>
+          <p>Ajoutez un article — il sera validé par l'administrateur.</p>
+        </div>
+        <div id="subBanner" style="margin:12px 0"></div>
+        <form id="productForm" class="product-form">
+          <div class="form-row">
+            <div class="form-group"><label>Titre</label><input name="title" required placeholder="Ex: Téléphone Samsung A54  /  Comptable Sénior" /></div>
+            <div class="form-group"><label>Catégorie</label><select name="category" required id="catSelect" onchange="switchFormForCat(this)"></select></div>
+          </div>
+
+          <!-- SECTION : Article standard -->
+          <div class="pf-section pf-article">
+            <div class="form-row">
+              <div class="form-group"><label>Prix de vente (FCFA)</label><input name="price" type="number" placeholder="0" /></div>
+              <div class="form-group"><label>Ancien prix (optionnel)</label><input name="oldPrice" type="number" placeholder="0" /></div>
+              <div class="form-group"><label>Stock disponible</label><input name="stock" type="number" placeholder="1" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>N° WhatsApp vendeur</label><input name="whatsapp" placeholder="2250700000000" /></div>
+              <div class="form-group"><label>N° SMS commande</label><input name="personalPhone" placeholder="2250700000000" /></div>
+            </div>
+          </div>
+
+          <!-- SECTION : Offre Emploi / Concours -->
+          <div class="pf-section pf-job" style="display:none">
+            <div class="paid-hint">
+              <span>🔒 Offre payante — le client paie pour voir les détails. Remplissez bien tous les champs.</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Entreprise / Organisme *</label><input name="employer" placeholder="Ex: PME Abengourou / Ministère" /></div>
+              <div class="form-group"><label>Lieu / Ville *</label><input name="jobLocation" placeholder="Abengourou, Côte d'Ivoire" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Type de contrat</label>
+                <select name="contractType">
+                  <option value="">— Sélectionner —</option>
+                  <option>CDI</option><option>CDD</option><option>Stage</option>
+                  <option>Freelance</option><option>Concours d'entrée</option><option>Autres</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Salaire / Dotation</label><input name="salary" placeholder="Ex: 200 000 FCFA/mois" /></div>
+              <div class="form-group"><label>Date limite</label><input name="deadline" type="date" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Prix d'accès aux détails (FCFA) *</label><input name="price" type="number" placeholder="Ex: 500" /></div>
+              <div class="form-group"><label>N° WhatsApp contact</label><input name="whatsapp" placeholder="2250700000000" /></div>
+            </div>
+            <input type="hidden" name="oldPrice" value="" />
+            <input type="hidden" name="stock" value="9999" />
+            <input type="hidden" name="personalPhone" value="" />
+          </div>
+
+          <div class="form-group" style="margin-top:8px">
+            <label>📷 Image de l'article</label>
+            <input name="image" type="file" accept="image/*" class="img-file-input" onchange="previewImg(this)" />
+            <div class="img-preview-wrap" style="display:none">
+              <img class="img-preview" alt="Aperçu" />
+              <button type="button" class="img-preview-remove" onclick="removeImgPreview(this)">✕ Supprimer</button>
+            </div>
+          </div>
+          <div class="form-group"><label>Description / Détails <small style="color:var(--muted)">(confidentiel pour emploi/concours)</small></label><textarea name="description" rows="4" placeholder="Décrivez votre article ou détails de l'offre…"></textarea></div>
+          <button type="submit" class="btn btn-primary btn-lg">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Publier l'article
+          </button>
+        </form>
+      </div>
+      <div class="section-block">
+        <h3 class="sub-title">Mes articles publiés</h3>
+        <div id="myProducts" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- ===== ADMIN ===== -->
+<!-- ADMIN -->
 <div id="page-admin" class="page-view">
-  <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
-  <section class="block">
-    <h2>Tableau de bord Administrateur</h2>
-    <div class="tabs" style="margin-top:12px;flex-wrap:wrap">
-      <button class="active" data-tab="vendors" onclick="adminTab('vendors')">Comptes vendeurs</button>
-      <button data-tab="products" onclick="adminTab('products')">Articles à valider</button>
-      <button data-tab="addproduct" onclick="adminTab('addproduct')">Ajouter un article</button>
-      <button data-tab="orders" onclick="adminTab('orders')">Commandes</button>
-      <button data-tab="settings" onclick="adminTab('settings')">SMS &amp; Abonnement</button>
+  <div class="container">
+    <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+    <div class="section-block admin-wrap">
+      <div class="admin-header">
+        <img src="/img/logo.png" alt="logo" class="admin-logo" />
+        <div>
+          <h2>Tableau de bord Administrateur</h2>
+          <p>Gérez les vendeurs, articles, commandes et paramètres SMS.</p>
+        </div>
+      </div>
+      <div class="admin-tabs" id="adminTabs">
+        <button class="active" data-tab="vendors" onclick="adminTab('vendors')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Vendeurs
+        </button>
+        <button data-tab="products" onclick="adminTab('products')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+          Articles
+        </button>
+        <button data-tab="addproduct" onclick="adminTab('addproduct')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Ajouter
+        </button>
+        <button data-tab="orders" onclick="adminTab('orders')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Commandes
+        </button>
+        <button data-tab="settings" onclick="adminTab('settings')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          SMS &amp; Config
+        </button>
+      </div>
+      <div id="adminContent" class="admin-content"></div>
     </div>
-    <div id="adminContent"></div>
-  </section>
+  </div>
 </div>
 
 </main>
 
-<!-- ===== 12. PIED DE PAGE ===== -->
+<!-- FOOTER -->
 <footer>
-  <div class="container cols">
-    <div>
-      <h3 style="color:var(--primary)">ABENGOUROU-MARKET</h3>
-      <p style="font-size:13px;opacity:.85;margin-top:8px">La plateforme numérique d'Abengourou.</p>
-      <p style="font-size:12px;opacity:.7;margin-top:8px">📍 Abengourou, Côte d'Ivoire</p>
-    </div>
-    <div>
-      <h3>Liens</h3>
-      <ul>
-        <li><a href="#" onclick="showText('apropos');return false">À propos</a></li>
-        <li><a href="#" onclick="showText('conditions');return false">Conditions d'utilisation</a></li>
-        <li><a href="#" onclick="showText('conf');return false">Politique de confidentialité</a></li>
-        <li><a href="#" onclick="showText('contact');return false">Contact</a></li>
-        <li><a href="#" onclick="showText('pub');return false">Publicité</a></li>
-      </ul>
-    </div>
-    <div>
-      <h3>Paiements</h3>
-      <ul>
-        <li><span class="pay-wave">Wave</span></li>
-        <li style="margin-top:6px">💵 Paiement à la livraison</li>
-      </ul>
-      <h3 style="margin-top:14px">Service client</h3>
-      <ul>
-        <li>Lun – Sam · 08h00 à 18h00</li>
-        <li>📞 +225 XX XX XX XX XX</li>
-        <li>📧 contact@abengourou-market.com</li>
-      </ul>
-    </div>
-    <div>
-      <h3>Réseaux sociaux</h3>
-      <div class="social">
-        <a href="#" title="Facebook">f</a>
-        <a href="#" title="WhatsApp">W</a>
-        <a href="#" title="TikTok">Tk</a>
-        <a href="#" title="Instagram">Ig</a>
-        <a href="#" title="YouTube">Yt</a>
+  <div class="footer-top">
+    <div class="container footer-grid">
+      <div class="footer-col footer-brand">
+        <img src="/img/logo.png" alt="ABENGOUROU-MARKET" class="footer-logo" />
+        <p>La plateforme numérique d'Abengourou.<br>Acheter, vendre, découvrir.</p>
+        <div class="social-links">
+          <a href="#" class="soc-fb" title="Facebook">f</a>
+          <a href="#" class="soc-wa" title="WhatsApp">W</a>
+          <a href="#" class="soc-tk" title="TikTok">Tk</a>
+          <a href="#" class="soc-ig" title="Instagram">Ig</a>
+          <a href="#" class="soc-yt" title="YouTube">Yt</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Liens utiles</h4>
+        <ul>
+          <li><a href="#" onclick="showText('apropos');return false">À propos de nous</a></li>
+          <li><a href="#" onclick="showText('conditions');return false">Conditions d'utilisation</a></li>
+          <li><a href="#" onclick="showText('conf');return false">Confidentialité</a></li>
+          <li><a href="#" onclick="showText('contact');return false">Contact</a></li>
+          <li><a href="#" onclick="showText('pub');return false">Publicité</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Paiements acceptés</h4>
+        <div class="pay-badges">
+          <span class="pbadge wave">Wave</span>
+          <span class="pbadge orange">Orange Money</span>
+          <span class="pbadge mtn">MTN MoMo</span>
+          <span class="pbadge moov">Moov Money</span>
+        </div>
+        <div style="margin-top:12px;font-size:13px;opacity:.8">💵 Paiement à la livraison disponible</div>
+      </div>
+      <div class="footer-col">
+        <h4>Service client</h4>
+        <ul>
+          <li>📞 +225 XX XX XX XX XX</li>
+          <li>📧 contact@abengourou-market.com</li>
+          <li>📍 Abengourou, Côte d'Ivoire</li>
+          <li style="margin-top:8px;opacity:.7">Lun – Sam · 08h00 à 18h00</li>
+        </ul>
       </div>
     </div>
   </div>
-  <div class="copy">© <span id="yr"></span> ABENGOUROU-MARKET. Tous droits réservés.</div>
+  <div class="footer-bottom">
+    <div class="container">
+      <span>© <span id="yr"></span> ABENGOUROU-MARKET. Tous droits réservés.</span>
+      <span>Fait avec ❤️ à Abengourou, Côte d'Ivoire 🇨🇮</span>
+    </div>
+  </div>
 </footer>
 
-<!-- ===== MODALS ===== -->
-<div class="modal-back" id="modal">
+<!-- MODAL -->
+<div class="modal-back" id="modal" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalBody"></div>
 </div>
 

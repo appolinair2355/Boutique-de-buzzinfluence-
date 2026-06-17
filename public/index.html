@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ABENGOUROU-MARKET — Marketplace d'Abengourou</title>
+<meta name="description" content="Plateforme numérique d'Abengourou : produits, immobilier, emplois, concours, transport, restaurants et plus." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<!-- ===== 1. BARRE SUPÉRIEURE ===== -->
+<header>
+  <div class="topbar">
+    <button class="menu-btn" id="menuBtn" title="Menu">☰</button>
+    <a href="#" class="logo" onclick="showHome();return false;">ABENGOUROU-MARKET</a>
+    <div class="search">
+      <input id="searchInput" placeholder="Rechercher un produit, un emploi, un terrain, une moto…" />
+      <button onclick="doSearch()">🔍</button>
+    </div>
+    <button class="icon-btn" onclick="openAccount()" title="Mon compte">👤</button>
+    <button class="icon-btn" onclick="alert('Favoris à venir')" title="Favoris">❤️</button>
+    <button class="icon-btn" onclick="openCart()" title="Panier">🛒 <span class="badge" id="cartCount">0</span></button>
+  </div>
+  <div class="flag-bar"></div>
+</header>
+
+<!-- mobile sidebar overlay -->
+<div class="mobile-sidebar" id="mobileSidebar" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="panel" id="mobileSidebarPanel"></div>
+</div>
+
+<main class="container">
+
+<!-- ===== HOME ===== -->
+<div id="page-home" class="page-view active">
+<div class="layout">
+
+  <!-- ===== 2. MENU LATÉRAL ===== -->
+  <aside class="sidebar" id="desktopSidebar"></aside>
+
+  <div>
+    <!-- ===== 3. BANNIÈRE ===== -->
+    <div class="hero">
+      <h1>Bienvenue sur ABENGOUROU-MARKET</h1>
+      <p>Promotions du mois · Terrains à vendre · Emplois disponibles · Concours ouverts · Événements de la ville · Offres de restaurants</p>
+    </div>
+
+    <!-- ===== 4. RACCOURCIS ===== -->
+    <div class="shortcuts" id="shortcuts"></div>
+
+    <!-- ===== 5. OFFRES FLASH ===== -->
+    <div class="flash-head">
+      <h2>⚡ Offres Flash</h2><a href="#" onclick="return false">Voir tout →</a>
+    </div>
+    <div class="grid-2" id="flashGrid" style="margin-top:12px"></div>
+
+    <!-- ===== BOUTIQUE (articles vendeurs/admin) ===== -->
+    <section class="block">
+      <div class="section-head"><h2>🛍️ Boutique</h2></div>
+      <div class="grid-3" id="shopGrid"></div>
+    </section>
+
+    <!-- ===== 6. CONCOURS-CI ===== -->
+    <section class="block">
+      <div class="section-head"><h2>🎓 Derniers Concours CI</h2><a href="#" onclick="return false">Voir tous les concours</a></div>
+      <div class="grid-3" id="concoursGrid"></div>
+    </section>
+
+    <!-- ===== 7. EMPLOI ===== -->
+    <section class="block">
+      <div class="section-head"><h2>💼 Dernières offres d'emploi</h2><a href="#" onclick="return false">Toutes les offres</a></div>
+      <div class="grid-3" id="jobsGrid"></div>
+    </section>
+
+    <!-- ===== 8. IMMOBILIER ===== -->
+    <section class="block">
+      <div class="section-head"><h2>🏠 Immobilier</h2><a href="#" onclick="return false">Voir plus</a></div>
+      <div class="grid-3" id="realGrid"></div>
+    </section>
+
+    <!-- ===== 9. TRANSPORT ===== -->
+    <section class="block">
+      <div class="section-head"><h2>🚕 Transport</h2></div>
+      <div class="grid-3" id="transportGrid"></div>
+    </section>
+
+    <!-- ===== 10. RESTAURANTS ===== -->
+    <section class="block">
+      <div class="section-head"><h2>🍽️ Restaurants & Livraison</h2><a href="#" onclick="return false">Tous les restaurants</a></div>
+      <div class="grid-3" id="restoGrid"></div>
+    </section>
+
+    <!-- ===== 11. ACTUALITÉS ABENGOUROU ===== -->
+    <section class="block">
+      <div class="section-head"><h2>📰 Actualités Abengourou</h2><a href="#" onclick="return false">Toute l'actu</a></div>
+      <ul class="news-list" id="newsList"></ul>
+    </section>
+  </div>
+</div>
+</div>
+
+<!-- ===== ABOUT / COND / CONF / CONTACT / PUB pages ===== -->
+<div id="page-text" class="page-view">
+  <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+  <section class="block" id="textBody"></section>
+</div>
+
+<!-- ===== VENDEUR DASHBOARD ===== -->
+<div id="page-vendeur" class="page-view">
+  <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+  <section class="block">
+    <h2>Espace Vendeur</h2>
+    <p style="color:var(--muted);font-size:13px;margin:8px 0">Ajoutez un article (sera validé par l'administrateur).</p>
+    <div id="subBanner" style="margin:8px 0"></div>
+    <form id="productForm">
+      <label>Titre de l'article</label><input name="title" required />
+      <label>Catégorie</label>
+      <select name="category" required id="catSelect"></select>
+      <label>Prix (FCFA)</label><input name="price" type="number" required />
+      <label>Ancien prix (optionnel)</label><input name="oldPrice" type="number" />
+      <label>Stock disponible</label><input name="stock" type="number" required />
+      <label>Numéro WhatsApp (contact client)</label><input name="whatsapp" placeholder="Ex : 2250700000000" required />
+      <label>Numéro personnel (réception SMS commande)</label><input name="personalPhone" placeholder="Ex : 2250700000000" required />
+      <label>Image de l'article</label><input name="image" type="file" accept="image/*" />
+      <label>Description</label><textarea name="description" rows="3"></textarea>
+      <div class="row"><button type="submit" class="btn btn-primary">Publier l'article</button></div>
+    </form>
+    <h3 style="margin-top:20px">Mes articles</h3>
+    <div id="myProducts" style="margin-top:10px"></div>
+  </section>
+</div>
+
+<!-- ===== ADMIN ===== -->
+<div id="page-admin" class="page-view">
+  <a class="back-link" href="#" onclick="showHome();return false;">← Retour à l'accueil</a>
+  <section class="block">
+    <h2>Tableau de bord Administrateur</h2>
+    <div class="tabs" style="margin-top:12px;flex-wrap:wrap">
+      <button class="active" data-tab="vendors" onclick="adminTab('vendors')">Comptes vendeurs</button>
+      <button data-tab="products" onclick="adminTab('products')">Articles à valider</button>
+      <button data-tab="addproduct" onclick="adminTab('addproduct')">Ajouter un article</button>
+      <button data-tab="orders" onclick="adminTab('orders')">Commandes</button>
+      <button data-tab="settings" onclick="adminTab('settings')">SMS &amp; Abonnement</button>
+    </div>
+    <div id="adminContent"></div>
+  </section>
+</div>
+
+</main>
+
+<!-- ===== 12. PIED DE PAGE ===== -->
+<footer>
+  <div class="container cols">
+    <div>
+      <h3 style="color:var(--primary)">ABENGOUROU-MARKET</h3>
+      <p style="font-size:13px;opacity:.85;margin-top:8px">La plateforme numérique d'Abengourou.</p>
+      <p style="font-size:12px;opacity:.7;margin-top:8px">📍 Abengourou, Côte d'Ivoire</p>
+    </div>
+    <div>
+      <h3>Liens</h3>
+      <ul>
+        <li><a href="#" onclick="showText('apropos');return false">À propos</a></li>
+        <li><a href="#" onclick="showText('conditions');return false">Conditions d'utilisation</a></li>
+        <li><a href="#" onclick="showText('conf');return false">Politique de confidentialité</a></li>
+        <li><a href="#" onclick="showText('contact');return false">Contact</a></li>
+        <li><a href="#" onclick="showText('pub');return false">Publicité</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Paiements</h3>
+      <ul>
+        <li><span class="pay-wave">Wave</span></li>
+        <li style="margin-top:6px">💵 Paiement à la livraison</li>
+      </ul>
+      <h3 style="margin-top:14px">Service client</h3>
+      <ul>
+        <li>Lun – Sam · 08h00 à 18h00</li>
+        <li>📞 +225 XX XX XX XX XX</li>
+        <li>📧 contact@abengourou-market.com</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Réseaux sociaux</h3>
+      <div class="social">
+        <a href="#" title="Facebook">f</a>
+        <a href="#" title="WhatsApp">W</a>
+        <a href="#" title="TikTok">Tk</a>
+        <a href="#" title="Instagram">Ig</a>
+        <a href="#" title="YouTube">Yt</a>
+      </div>
+    </div>
+  </div>
+  <div class="copy">© <span id="yr"></span> ABENGOUROU-MARKET. Tous droits réservés.</div>
+</footer>
+
+<!-- ===== MODALS ===== -->
+<div class="modal-back" id="modal">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

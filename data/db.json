@@ -1,6 +1,48 @@
 {
-  "users": [],
-  "products": [],
+  "users": [
+    {
+      "id": "kouame",
+      "pwd": "arrow2025",
+      "name": "Sossou Kouamé",
+      "phone": "67924076",
+      "role": "vendeur",
+      "approved": true,
+      "subscriptionUntil": "2026-08-17T20:22:26.224Z"
+    }
+  ],
+  "products": [
+    {
+      "id": 1781729153235,
+      "title": "Comptable CDI",
+      "category": "emploi",
+      "price": 500,
+      "oldPrice": null,
+      "stock": 9999,
+      "stockInit": 9999,
+      "image": null,
+      "description": "🏢 Entreprise : PME Test\n📍 Lieu : Abengourou\n💰 Salaire : 250000 FCFA",
+      "whatsapp": "",
+      "personalPhone": "",
+      "ownerId": "buzz",
+      "ownerName": "Administrateur",
+      "ownerRole": "admin",
+      "approved": true,
+      "blocked": false
+    }
+  ],
   "orders": [],
-  "settings": {}
+  "settings": {
+    "companyName": "ABENGOUROU-MARKET",
+    "subscriptionPrice": 5000,
+    "sms": {
+      "enabled": false,
+      "method": "POST",
+      "url": "",
+      "contentType": "application/json",
+      "headers": "",
+      "bodyTemplate": "",
+      "sender": "ABGMARKET",
+      "apiKey": ""
+    }
+  }
 }

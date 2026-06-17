@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 1000;
+const PORT = process.env.PORT || 5000;
 const DATA_FILE = path.join(__dirname, "data", "db.json");
 
 const ADMIN_ID = process.env.ADMIN_ID || "buzz";
@@ -73,24 +73,22 @@ function productVisible(p, db) {
   return vendorActive(owner);
 }
 
-// ---------- Generic SMS sender (any platform) ----------
+// ---------- Generic SMS sender ----------
 async function sendSMS(settings, to, message) {
   const sms = settings.sms || {};
   if (!sms.enabled || !sms.url || !to) return { ok: false, skipped: true };
+  const from = sms.sender || settings.companyName || "ABGMARKET";
   const fill = (s) =>
     String(s || "")
       .replaceAll("{to}", to)
       .replaceAll("{message}", message)
-      .replaceAll("{from}", sms.sender || settings.companyName || "");
-  let headers = { "Content-Type": sms.contentType || "application/json" };
+      .replaceAll("{from}", from);
+  const headers = { "Content-Type": "application/json" };
+  if (sms.apiKey) headers["Authorization"] = `Bearer ${sms.apiKey}`;
+  const body = JSON.stringify({ to, from, text: message });
+  const url = fill(sms.url);
   try {
-    if (sms.headers && sms.headers.trim()) headers = { ...headers, ...JSON.parse(sms.headers) };
-  } catch {}
-  let url = fill(sms.url);
-  const opts = { method: (sms.method || "POST").toUpperCase(), headers };
-  if (opts.method !== "GET") opts.body = fill(sms.bodyTemplate);
-  try {
-    const r = await fetch(url, opts);
+    const r = await fetch(url, { method: "POST", headers, body });
     const text = await r.text().catch(() => "");
     return { ok: r.ok, status: r.status, body: text.slice(0, 300) };
   } catch (e) {
@@ -276,6 +274,10 @@ app.post("/api/orders", async (req, res) => {
   const db = loadDB();
   const orderNo = "CMD-" + Date.now().toString().slice(-6);
   const o = { id: Date.now(), orderNo, createdAt: new Date().toISOString(), ...req.body };
+
+  // Sauvegarder la commande dans la base
+  db.orders = db.orders || [];
+  db.orders.push(o);
 
   // décrémente le stock + notifie chaque propriétaire d'article par SMS
   const owners = {}; // personalPhone -> {names:[]}

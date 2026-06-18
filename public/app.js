@@ -19,12 +19,14 @@ const CATEGORIES = [
   ["concours-ci","📚","Concours CI"],
   ["emploi","💼","Emploi"],
   ["transport","🚕","Transport"],
+  ["braderie","🏷️","Braderie"],
+  ["rencontres","❤️","Rencontres & Amitiés"],
 ];
 
 const SHORTCUTS = [
   ["📚","Concours CI","concours-ci"],["💼","Emploi","emploi"],["🏠","Immobilier","immobilier"],
   ["🚕","Taxi","transport"],["🍽️","Livraison","restaurants"],["📢","Annonces","annonces"],
-  ["📰","Actualités","actualites"],["🎉","Événements","evenements"],
+  ["❤️","Rencontres","rencontres"],["🏷️","Braderie","braderie"],
 ];
 
 const BANNERS = [
@@ -62,6 +64,7 @@ const PAID_CATS = new Set(["emploi","concours-ci","recrutement"]);
 
 async function filterCat(cat) {
   document.getElementById("mobileSidebar").classList.remove("show");
+  if (cat === "rencontres") return showRencontresPage();
   const catInfo = CATEGORIES.find(c => c[0] === cat) || [cat, "🗂️", cat];
   const [slug, icon, label] = catInfo;
 
@@ -247,6 +250,212 @@ function openProductDetail(p) {
     </div>`);
 }
 
+// ============ RENCONTRES ============
+const RENCONTRE_SOUS = { amitie: "💙 Amitié", serieux: "❤️ Relation sérieuse" };
+
+function rencontreCard(p) {
+  const sousLabel = RENCONTRE_SOUS[p.souscat] || "❤️ Rencontre";
+  const sousCls   = p.souscat === "serieux" ? "rcat-serieux" : "rcat-amitie";
+  const descShort = (p.descShort || "").slice(0, 130);
+  const pData = JSON.stringify({id:p.id,displayName:p.displayName,age:p.age,profession:p.profession,ville:p.ville,quartier:p.quartier,souscat:p.souscat,prixAcces:p.prixAcces,descShort:p.descShort||""}).replace(/'/g,"&#39;");
+  return `<div class="rcard" onclick='openRencontreDetail(${pData})'>
+    <div class="rcard-heart">❤️</div>
+    <div class="rcard-body">
+      <div class="rcard-name">${p.displayName}</div>
+      <div class="rcard-info">
+        ${p.age ? `<span>🎂 ${p.age} ans</span>` : ""}
+        ${p.profession ? `<span>💼 ${p.profession}</span>` : ""}
+        ${p.ville ? `<span>📍 ${p.ville}${p.quartier ? ", "+p.quartier : ""}</span>` : ""}
+      </div>
+      <span class="rcard-badge ${sousCls}">${sousLabel}</span>
+      ${descShort ? `<div class="rcard-desc">${descShort}${(p.descShort||"").length>130?"…":""}</div>` : ""}
+      <div class="rcard-lock">🔒 Coordonnées masquées — accès sur paiement</div>
+      <div class="rcard-price">${fmt(p.prixAcces)}</div>
+      <button class="rcard-btn" onclick="event.stopPropagation();openRencontreDetail(${pData})">❤️ Voir le profil complet</button>
+    </div>
+  </div>`;
+}
+
+function openRencontreDetail(p) {
+  const sousLabel = RENCONTRE_SOUS[p.souscat] || "❤️ Rencontre";
+  modalHTML(`
+    <h2>❤️ Profil Rencontres <button class="modal-close" onclick="closeModal()">✕</button></h2>
+    <div style="background:linear-gradient(135deg,#fce4ec,#fff8f8);border-radius:var(--radius);padding:16px;margin-bottom:14px;text-align:center">
+      <div style="font-size:48px;margin-bottom:8px">❤️</div>
+      <div style="font-size:20px;font-weight:700;color:#c2185b">${p.displayName}</div>
+      <div style="font-size:13px;color:#777;margin-top:4px">
+        ${p.age ? p.age+" ans" : ""}${p.profession ? " · "+p.profession : ""}${p.ville ? " · "+p.ville : ""}
+      </div>
+      <span style="display:inline-block;margin-top:8px;background:#fce4ec;color:#c2185b;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">${sousLabel}</span>
+    </div>
+    ${p.descShort ? `<div style="background:#f9f9f9;border-radius:var(--radius);padding:12px;font-size:13px;line-height:1.7;color:#555;margin-bottom:14px;white-space:pre-line">${p.descShort}${(p.descShort||"").length>=148?"…":""}</div>` : ""}
+    <div style="background:#FFF3E0;border:1.5px solid #FFCC80;border-radius:var(--radius);padding:14px;margin-bottom:16px;font-size:13px;line-height:1.8">
+      <strong>🔒 Coordonnées masquées</strong><br>
+      Pour accéder au profil complet (photo, numéros, description complète) :<br>
+      1. Ajoutez ce profil à votre panier<br>
+      2. Effectuez le paiement (${fmt(p.prixAcces)})<br>
+      3. L'administrateur vous accordera l'accès complet via WhatsApp
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Fermer</button>
+      <button class="btn btn-primary" style="background:linear-gradient(135deg,#e91e8c,#c2185b)" onclick='addCart({id:${p.id},name:${JSON.stringify(p.displayName)},price:${p.prixAcces},emoji:"❤️"});closeModal()'>
+        ❤️ Accéder au profil — ${fmt(p.prixAcces)}
+      </button>
+    </div>`);
+}
+
+function openRencontreRegister() {
+  modalHTML(`
+    <h2>❤️ Créer un profil <button class="modal-close" onclick="closeModal()">✕</button></h2>
+    <div style="background:#fce4ec;border-left:4px solid #c2185b;border-radius:0 var(--radius) var(--radius) 0;padding:10px 14px;font-size:12px;margin-bottom:14px;line-height:1.6">
+      ✅ Réservé aux <strong>majeurs (18 ans et plus)</strong>. Votre profil sera vérifié par l'administrateur avant publication. Votre identité réelle reste confidentielle.
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Nom *</label><input id="rcNom" placeholder="Votre nom" /></div>
+      <div class="form-group"><label>Prénom *</label><input id="rcPrenom" placeholder="Votre prénom" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Date de naissance *</label><input id="rcBirth" type="date" max="${new Date(new Date().setFullYear(new Date().getFullYear()-18)).toISOString().split('T')[0]}" /></div>
+      <div class="form-group"><label>Sexe *</label>
+        <select id="rcSexe"><option value="">— Sélectionner —</option><option value="Homme">Homme</option><option value="Femme">Femme</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Profession</label><input id="rcProf" placeholder="Ex: Commerçant, Étudiant…" /></div>
+      <div class="form-group"><label>Ville</label><input id="rcVille" placeholder="Ex: Abengourou" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Quartier</label><input id="rcQuartier" placeholder="Ex: Centre-ville" /></div>
+      <div class="form-group"><label>Type de rencontre</label>
+        <select id="rcSouscat"><option value="amitie">💙 Amitié</option><option value="serieux">❤️ Relation sérieuse</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>N° WhatsApp</label><input id="rcWa" placeholder="2250700000000" type="tel" /></div>
+      <div class="form-group"><label>N° Téléphone</label><input id="rcPhone" placeholder="2250700000000" type="tel" /></div>
+    </div>
+    <div class="form-group"><label>Prix d'accès à votre profil (FCFA)</label><input id="rcPrix" type="number" placeholder="500" value="500" /></div>
+    <div class="form-group">
+      <label>📷 Votre photo <small style="color:var(--muted)">(jamais visible publiquement — uniquement après accès accordé)</small></label>
+      <input id="rcPhoto" type="file" accept="image/*,image/heic,image/heif" class="img-file-input" onchange="previewRcImg(this)" />
+      <div id="rcPhotoPreview" style="display:none;margin-top:8px;display:flex;align-items:center;gap:10px">
+        <img id="rcPhotoImg" style="width:72px;height:72px;object-fit:cover;border-radius:50%;border:3px solid #c2185b" />
+        <button type="button" class="img-preview-remove" onclick="document.getElementById('rcPhoto').value='';document.getElementById('rcPhotoPreview').style.display='none'">✕ Supprimer</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description <small style="color:var(--muted)">(décrivez-vous et le type de personne que vous recherchez)</small></label>
+      <textarea id="rcDesc" rows="5" placeholder="Je suis une personne sérieuse…&#10;Je recherche quelqu'un qui…&#10;Mes coordonnées : WhatsApp +225… / Tél +225…" style="width:100%;border:1px solid #ddd;border-radius:var(--radius);padding:10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div style="background:#fce4ec;border-radius:var(--radius);padding:12px;font-size:12px;margin-bottom:16px;line-height:1.8">
+      <strong>📋 Règles à respecter :</strong><br>
+      ✅ Respect obligatoire entre utilisateurs<br>
+      ✅ Interdiction des contenus sexuels ou obscènes<br>
+      ✅ Interdiction de la prostitution et des services d'escorte<br>
+      ✅ Interdiction des arnaques et demandes d'argent<br>
+      ✅ Réservé aux personnes majeures (18 ans et plus)<br>
+      ✅ Vos infos personnelles restent protégées
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+      <button id="rcSubmitBtn" class="btn btn-primary" style="background:linear-gradient(135deg,#e91e8c,#c2185b)" onclick="submitRencontreProfile()">
+        ❤️ Envoyer mon profil
+      </button>
+    </div>`);
+}
+
+function previewRcImg(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById("rcPhotoImg").src = ev.target.result;
+    document.getElementById("rcPhotoPreview").style.display = "flex";
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function submitRencontreProfile() {
+  const nom = document.getElementById("rcNom").value.trim();
+  const prenom = document.getElementById("rcPrenom").value.trim();
+  const birthdate = document.getElementById("rcBirth").value;
+  const sexe = document.getElementById("rcSexe").value;
+  if (!nom || !prenom || !birthdate || !sexe) return toast("Remplissez les champs obligatoires (nom, prénom, date, sexe)", "red");
+  const age = new Date().getFullYear() - new Date(birthdate).getFullYear();
+  if (age < 18) return toast("Vous devez avoir au moins 18 ans", "red");
+  const btn = document.getElementById("rcSubmitBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Envoi en cours…"; }
+  const photoFile = document.getElementById("rcPhoto").files[0];
+  let photo = null;
+  if (photoFile) photo = await compressImage(photoFile);
+  const body = {
+    nom, prenom, birthdate, sexe,
+    profession: document.getElementById("rcProf").value.trim(),
+    ville: document.getElementById("rcVille").value.trim(),
+    quartier: document.getElementById("rcQuartier").value.trim(),
+    whatsapp: document.getElementById("rcWa").value.trim(),
+    phone: document.getElementById("rcPhone").value.trim(),
+    prixAcces: Number(document.getElementById("rcPrix").value) || 500,
+    description: document.getElementById("rcDesc").value.trim(),
+    souscat: document.getElementById("rcSouscat").value,
+    photo,
+  };
+  try {
+    const r = await fetch("/api/rencontres", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (r.ok) {
+      closeModal();
+      toast("✓ Profil envoyé — en attente de validation par l'administrateur", "green");
+    } else { toast(j.error || "Erreur lors de l'envoi", "red"); }
+  } catch { toast("Erreur réseau", "red"); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = "❤️ Envoyer mon profil"; } }
+}
+
+async function showRencontresPage() {
+  showPage("page-category");
+  const wrap = document.getElementById("catPageContent");
+  wrap.innerHTML = `
+    <div class="cat-page-header">
+      <span class="cat-page-icon">❤️</span>
+      <div><h2>Rencontres & Amitiés</h2><p>Trouvez de nouvelles connaissances dans un cadre respectueux et sécurisé</p></div>
+    </div>
+    <div class="rencontre-rules">
+      <h4>📋 Règles de la communauté</h4>
+      ✅ Respect obligatoire entre utilisateurs &nbsp;·&nbsp; ✅ Interdiction des contenus obscènes<br>
+      ✅ Interdiction de la prostitution &nbsp;·&nbsp; ✅ Interdiction des arnaques et demandes d'argent<br>
+      ✅ Réservé aux personnes majeures (18 ans et plus) &nbsp;·&nbsp; ✅ Informations personnelles protégées
+    </div>
+    <div style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="background:linear-gradient(135deg,#e91e8c,#c2185b)" onclick="openRencontreRegister()">❤️ Créer mon profil</button>
+    </div>
+    <div class="section-block">
+      <div class="loading-placeholder"><div class="spinner"></div><p>Chargement des profils…</p></div>
+    </div>`;
+  let profiles = [];
+  try { profiles = await (await fetch("/api/rencontres")).json(); } catch {}
+  if (!profiles.length) {
+    wrap.querySelector(".section-block").innerHTML = `<div class="empty-state"><div class="empty-ico">❤️</div><p>Aucun profil disponible pour le moment.</p><button class="btn btn-primary" style="margin-top:12px;background:linear-gradient(135deg,#e91e8c,#c2185b)" onclick="openRencontreRegister()">❤️ Créer le premier profil</button></div>`;
+    return;
+  }
+  const byAmitie = profiles.filter(p => p.souscat !== "serieux");
+  const bySerieux = profiles.filter(p => p.souscat === "serieux");
+  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:16px">${profiles.length} profil${profiles.length>1?"s":""} disponible${profiles.length>1?"s":""}</div>`;
+  if (bySerieux.length) html += `<h3 style="margin-bottom:12px;color:#c2185b">❤️ Relation sérieuse</h3><div class="rencontre-grid">${bySerieux.map(rencontreCard).join("")}</div><br>`;
+  if (byAmitie.length) html += `<h3 style="margin-bottom:12px;color:#1565c0">💙 Amitié</h3><div class="rencontre-grid">${byAmitie.map(rencontreCard).join("")}</div>`;
+  wrap.querySelector(".section-block").innerHTML = html;
+}
+
+async function loadRencontresSection() {
+  const el = document.getElementById("rencontresGrid");
+  if (!el) return;
+  let profiles = [];
+  try { profiles = await (await fetch("/api/rencontres")).json(); } catch {}
+  if (!profiles.length) {
+    el.innerHTML = `<div class="tile-empty" style="grid-column:1/-1"><span>❤️</span><p>Aucun profil disponible pour le moment</p></div>`;
+    return;
+  }
+  el.innerHTML = profiles.slice(0, 4).map(rencontreCard).join("");
+}
+
 // ============ RENDER HOME ============
 function renderHome() {
   renderSidebar(document.getElementById("desktopSidebar"));
@@ -265,6 +474,7 @@ function renderHome() {
   loadCatSection("restoGrid", "restaurants", "🍽️", "Aucun restaurant disponible.", "products-grid");
   loadNewsSection();
   loadShop();
+  loadRencontresSection();
 }
 
 // Offres flash = produits avec remise publiés (oldPrice > price)
@@ -1120,6 +1330,108 @@ async function adminTab(which) {
             <div class="order-total">💰 Total : ${fmt(o.total)} · 💳 ${o.payMethod||"—"}</div>
           </div>`).join("")}`;
 
+  } else if (which === "rencontres") {
+    const all = await (await fetch("/api/rencontres/all")).json();
+    const pending = all.filter(p => !p.approved).length;
+    c.innerHTML = `
+      <div class="admin-stats">
+        <div class="stat-card"><div class="stat-num">${all.length}</div><div class="stat-lbl">Total profils</div></div>
+        <div class="stat-card green"><div class="stat-num">${all.filter(p=>p.approved).length}</div><div class="stat-lbl">Approuvés</div></div>
+        <div class="stat-card dark"><div class="stat-num">${pending}</div><div class="stat-lbl">En attente</div></div>
+      </div>
+      ${!all.length ? `<div class="empty-state"><div class="empty-ico">❤️</div><p>Aucun profil reçu.</p></div>`
+        : all.map(p => {
+          const st = p.approved
+            ? `<span class="status-badge status-ok">✓ Approuvé</span>`
+            : `<span class="status-badge status-wait">⏳ En attente</span>`;
+          const photoHtml = p.photo
+            ? `<img src="${p.photo}" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid #c2185b;flex-shrink:0" />`
+            : `<div style="width:44px;height:44px;background:#fce4ec;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">❤️</div>`;
+          const sousLabel = RENCONTRE_SOUS[p.souscat] || p.souscat;
+          return `<div class="admin-row">
+            <div class="admin-row-head">
+              <div style="display:flex;gap:10px;align-items:center">
+                ${photoHtml}
+                <div>
+                  <div class="admin-row-name">${p.nom} ${p.prenom} — ${p.age} ans — ${p.sexe}</div>
+                  <div class="admin-row-sub">${sousLabel} · ${p.profession||"—"} · ${p.ville||"—"} ${p.quartier||""}</div>
+                  <div class="admin-row-sub" style="color:#c2185b">WA: ${p.whatsapp||"—"} · Tél: ${p.phone||"—"} · Accès: ${fmt(p.prixAcces)}</div>
+                  ${p.description ? `<div class="admin-row-sub" style="margin-top:4px;font-style:italic;color:#666">${p.description.slice(0,120)}${p.description.length>120?"…":""}</div>` : ""}
+                </div>
+              </div>
+              ${st}
+            </div>
+            <div class="admin-row-actions">
+              ${!p.approved ? `<button class="btn btn-secondary btn-sm" onclick="approveRencontre(${p.id})">✓ Approuver</button>` : ""}
+              <button class="btn btn-danger btn-sm" onclick="deleteRencontre(${p.id})">Supprimer</button>
+            </div>
+          </div>`;
+        }).join("")}`;
+
+  } else if (which === "data") {
+    const stats = await (await fetch("/api/admin/db-stats")).json();
+    const tableLabels = { users:"👥 Utilisateurs", products:"📦 Articles", orders:"🛒 Commandes", settings:"⚙️ Paramètres", rencontres:"❤️ Rencontres" };
+    c.innerHTML = `
+      <div class="db-panel">
+        <h3 class="db-title">🗄️ Gestion de la Base de Données</h3>
+        <p class="db-subtitle">Exportez, sauvegardez ou restaurez toutes les données du marketplace.</p>
+
+        <!-- STATS -->
+        <div class="db-stats-grid">
+          ${Object.entries(stats).map(([t,n]) => `
+            <div class="db-stat-card">
+              <div class="db-stat-icon">${(tableLabels[t]||t).split(" ")[0]}</div>
+              <div class="db-stat-body">
+                <div class="db-stat-num">${n}</div>
+                <div class="db-stat-lbl">${(tableLabels[t]||t).replace(/^.\s/,"")}</div>
+              </div>
+            </div>`).join("")}
+        </div>
+
+        <!-- EXPORT -->
+        <div class="db-section">
+          <div class="db-section-title">📤 Exporter les données</div>
+          <p class="db-section-desc">Téléchargez une sauvegarde complète de toutes les tables.</p>
+          <div class="db-actions">
+            <a href="/api/admin/export/excel" class="btn btn-primary db-btn" download>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              📊 Exporter en Excel (.xlsx)
+            </a>
+            <a href="/api/admin/export/json" class="btn btn-secondary db-btn" download>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              💾 Exporter en JSON (backup)
+            </a>
+          </div>
+          <div class="db-info-box">
+            <strong>Excel :</strong> 1 feuille par table (utilisateurs, articles, commandes, rencontres, paramètres) — idéal pour consulter dans Excel / LibreOffice.<br/>
+            <strong>JSON :</strong> Sauvegarde complète à réimporter plus tard ou migrer vers un autre serveur.
+          </div>
+        </div>
+
+        <!-- IMPORT -->
+        <div class="db-section">
+          <div class="db-section-title">📥 Importer des données (JSON)</div>
+          <p class="db-section-desc">Restaurez une sauvegarde JSON. Les entrées existantes sont mises à jour, les nouvelles sont ajoutées.</p>
+          <div class="db-import-area" id="dbImportArea" onclick="document.getElementById('dbFileInput').click()">
+            <div class="db-import-icon">📂</div>
+            <div class="db-import-text">Cliquez pour choisir un fichier JSON</div>
+            <div class="db-import-hint">ou glissez-déposez ici</div>
+            <input type="file" id="dbFileInput" accept=".json" style="display:none" onchange="importDbFile(this)" />
+          </div>
+          <div id="dbImportResult"></div>
+        </div>
+
+        <div class="db-warn-box">
+          ⚠️ <strong>Important :</strong> L'import fonctionne par UPSERT (insertion ou mise à jour). Il ne supprime jamais de données existantes. Importez uniquement des fichiers JSON générés par ce système.
+        </div>
+      </div>`;
+
+    // Drag & drop
+    const area = document.getElementById("dbImportArea");
+    area.addEventListener("dragover", e => { e.preventDefault(); area.classList.add("drag-over"); });
+    area.addEventListener("dragleave", () => area.classList.remove("drag-over"));
+    area.addEventListener("drop", e => { e.preventDefault(); area.classList.remove("drag-over"); const f = e.dataTransfer.files[0]; if(f) importDbFileObj(f); });
+
   } else if (which === "settings") {
     const s = await (await fetch("/api/settings")).json();
     const sm = s.sms || {};
@@ -1218,6 +1530,28 @@ function toggleSmsFields() {
   if (wrap) { wrap.style.opacity = enabled ? "1" : ".45"; wrap.style.pointerEvents = enabled ? "" : "none"; }
 }
 
+async function importDbFileObj(file) {
+  const res = document.getElementById("dbImportResult");
+  if (!file) return;
+  res.innerHTML = `<div class="db-import-progress">⏳ Import en cours…</div>`;
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const r = await fetch("/api/admin/import/json", { method: "POST", body: fd });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    const lignes = Object.entries(d.imported || {}).map(([t,n]) => `<li><strong>${t}</strong> : ${n} entrée(s) traitée(s)</li>`).join("");
+    res.innerHTML = `<div class="db-import-ok">✅ Import réussi !<ul>${lignes}</ul></div>`;
+    toast("Import terminé ✓", "green");
+  } catch (e) {
+    res.innerHTML = `<div class="db-import-err">❌ Erreur : ${e.message}</div>`;
+    toast("Erreur lors de l'import", "");
+  }
+}
+function importDbFile(input) { if (input.files[0]) importDbFileObj(input.files[0]); }
+
+async function approveRencontre(id) { await fetch("/api/rencontres/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Profil approuvé ✓","green"); adminTab("rencontres"); }
+async function deleteRencontre(id) { if(!confirm("Supprimer ce profil ?"))return; await fetch("/api/rencontres/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Profil supprimé"); adminTab("rencontres"); }
 async function approveVendor(id) { await fetch("/api/vendors/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Compte vendeur approuvé ✓","green"); adminTab("vendors"); }
 async function deleteVendor(id) { if(!confirm("Supprimer ce compte vendeur ?"))return; await fetch("/api/vendors/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Vendeur supprimé",""); adminTab("vendors"); }
 async function approveProduct(id) { await fetch("/api/products/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Article validé ✓","green"); adminTab("products"); }

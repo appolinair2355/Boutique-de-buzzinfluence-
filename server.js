@@ -1,94 +1,183 @@
 /**
- * ABENGOUROU-MARKET - serveur Express
- * Render.com - port 1000
+ * ABENGOUROU-MARKET - serveur Express + PostgreSQL (Render.com)
  */
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
+const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DATA_FILE = path.join(__dirname, "data", "db.json");
 
-const ADMIN_ID = process.env.ADMIN_ID || "buzz";
+const ADMIN_ID  = process.env.ADMIN_ID  || "buzz";
 const ADMIN_PWD = process.env.ADMIN_PWD || "arrow";
 
-app.use(express.json({ limit: "12mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+// ─── Connexion PostgreSQL ────────────────────────────────────────────────────
+const pool = new Pool({
+  connectionString: "postgresql://boutique_en_ligne_user:28HKostTV7XpwU2nVso0cKbQwd1avOBn@dpg-d8pq2337uimc73aedqog-a.oregon-postgres.render.com/boutique_en_ligne",
+  ssl: { rejectUnauthorized: false },
+});
 
-// ---------- DB helpers ----------
-function emptyDB() {
-  return {
-    users: [],
-    products: [],
-    orders: [],
-    settings: {
-      companyName: "ABENGOUROU-MARKET",
-      subscriptionPrice: 5000,          // FCFA / mois (par défaut)
-      sms: {
-        enabled: false,
-        method: "POST",
-        url: "",
-        contentType: "application/json", // application/json | application/x-www-form-urlencoded
-        headers: "",                     // ex: {"Authorization":"Bearer XXX"}
-        bodyTemplate: "",                // placeholders: {to} {message} {from}
-        sender: "ABGMARKET",
-      },
-    },
-  };
-}
-function loadDB() {
-  try {
-    const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-    const def = emptyDB();
-    db.settings = { ...def.settings, ...(db.settings || {}) };
-    db.settings.sms = { ...def.settings.sms, ...(db.settings.sms || {}) };
-    db.users = db.users || [];
-    db.products = db.products || [];
-    db.orders = db.orders || [];
-    return db;
-  } catch {
-    return emptyDB();
-  }
-}
-function saveDB(db) {
-  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
-}
-if (!fs.existsSync(DATA_FILE)) saveDB(emptyDB());
+// ─── Création des tables au démarrage ───────────────────────────────────────
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id               TEXT PRIMARY KEY,
+      pwd              TEXT NOT NULL,
+      name             TEXT NOT NULL,
+      phone            TEXT DEFAULT '',
+      role             TEXT DEFAULT 'vendeur',
+      approved         BOOLEAN DEFAULT FALSE,
+      subscription_until TIMESTAMPTZ,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    );
 
-// ---------- Subscription helpers ----------
+    CREATE TABLE IF NOT EXISTS products (
+      id               BIGINT PRIMARY KEY,
+      title            TEXT NOT NULL,
+      category         TEXT NOT NULL,
+      price            NUMERIC DEFAULT 0,
+      old_price        NUMERIC,
+      stock            INT DEFAULT 0,
+      stock_init       INT DEFAULT 0,
+      image            TEXT,
+      description      TEXT DEFAULT '',
+      whatsapp         TEXT DEFAULT '',
+      personal_phone   TEXT DEFAULT '',
+      owner_id         TEXT NOT NULL,
+      owner_name       TEXT DEFAULT '',
+      owner_role       TEXT DEFAULT 'vendeur',
+      approved         BOOLEAN DEFAULT FALSE,
+      blocked          BOOLEAN DEFAULT FALSE,
+      employer         TEXT DEFAULT '',
+      job_location     TEXT DEFAULT '',
+      contract_type    TEXT DEFAULT '',
+      salary           TEXT DEFAULT '',
+      deadline         TEXT DEFAULT '',
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id               BIGINT PRIMARY KEY,
+      order_no         TEXT NOT NULL,
+      client_name      TEXT DEFAULT '',
+      client_phone     TEXT DEFAULT '',
+      delivery         TEXT DEFAULT '',
+      items            JSONB DEFAULT '[]',
+      total            NUMERIC DEFAULT 0,
+      pay_method       TEXT DEFAULT '',
+      pay_num          TEXT DEFAULT '',
+      sms_results      JSONB DEFAULT '[]',
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      id                  INT PRIMARY KEY DEFAULT 1,
+      company_name        TEXT DEFAULT 'ABENGOUROU-MARKET',
+      subscription_price  NUMERIC DEFAULT 5000,
+      sms_config          JSONB DEFAULT '{}'
+    );
+
+    INSERT INTO settings (id, company_name, subscription_price, sms_config)
+    VALUES (1, 'ABENGOUROU-MARKET', 5000,
+      '{"enabled":false,"method":"POST","url":"","contentType":"application/json","headers":"","bodyTemplate":"","sender":"ABGMARKET","apiKey":""}')
+    ON CONFLICT (id) DO NOTHING;
+  `);
+  console.log("✅ Tables PostgreSQL prêtes");
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 function vendorActive(u) {
   if (!u) return false;
   if (u.role === "admin") return true;
-  if (!u.approved) return false;
-  if (!u.subscriptionUntil) return false;
-  return new Date(u.subscriptionUntil).getTime() > Date.now();
-}
-// A product is publicly visible if approved, not blocked, and its owner is active.
-function productVisible(p, db) {
-  if (!p.approved || p.blocked) return false;
-  if (p.ownerRole === "admin") return true;
-  const owner = db.users.find((u) => u.id === p.ownerId);
-  return vendorActive(owner);
+  return u.approved === true;
 }
 
-// ---------- Generic SMS sender ----------
+function rowToUser(r) {
+  return {
+    id: r.id,
+    pwd: r.pwd,
+    name: r.name,
+    phone: r.phone,
+    role: r.role,
+    approved: r.approved,
+    subscription_until: r.subscription_until,
+    subscriptionUntil: r.subscription_until,
+    active: vendorActive(r),
+  };
+}
+
+function rowToProduct(r) {
+  return {
+    id: Number(r.id),
+    title: r.title,
+    category: r.category,
+    price: Number(r.price),
+    oldPrice: r.old_price ? Number(r.old_price) : null,
+    stock: r.stock,
+    stockInit: r.stock_init,
+    image: r.image || null,
+    description: r.description || "",
+    whatsapp: r.whatsapp || "",
+    personalPhone: r.personal_phone || "",
+    ownerId: r.owner_id,
+    ownerName: r.owner_name,
+    ownerRole: r.owner_role,
+    approved: r.approved,
+    blocked: r.blocked,
+    employer: r.employer || "",
+    jobLocation: r.job_location || "",
+    contractType: r.contract_type || "",
+    salary: r.salary || "",
+    deadline: r.deadline || "",
+    createdAt: r.created_at,
+  };
+}
+
+function rowToOrder(r) {
+  return {
+    id: Number(r.id),
+    orderNo: r.order_no,
+    name: r.client_name,
+    phone: r.client_phone,
+    delivery: r.delivery,
+    items: r.items,
+    total: Number(r.total),
+    payMethod: r.pay_method,
+    payNum: r.pay_num,
+    smsResults: r.sms_results,
+    createdAt: r.created_at,
+  };
+}
+
+async function getSettings() {
+  const { rows } = await pool.query("SELECT * FROM settings WHERE id=1");
+  const s = rows[0] || {};
+  const defaultSms = { enabled: false, method: "POST", url: "", contentType: "application/json", headers: "", bodyTemplate: "", sender: "ABGMARKET", apiKey: "" };
+  return {
+    companyName: s.company_name || "ABENGOUROU-MARKET",
+    subscriptionPrice: Number(s.subscription_price) || 5000,
+    sms: { ...defaultSms, ...(s.sms_config || {}) },
+  };
+}
+
+async function productVisible(p) {
+  if (!p.approved || p.blocked) return false;
+  if (p.ownerRole === "admin") return true;
+  const { rows } = await pool.query("SELECT * FROM users WHERE id=$1", [p.ownerId]);
+  return vendorActive(rows[0]);
+}
+
+// ─── SMS sender ──────────────────────────────────────────────────────────────
 async function sendSMS(settings, to, message) {
   const sms = settings.sms || {};
   if (!sms.enabled || !sms.url || !to) return { ok: false, skipped: true };
   const from = sms.sender || settings.companyName || "ABGMARKET";
-  const fill = (s) =>
-    String(s || "")
-      .replaceAll("{to}", to)
-      .replaceAll("{message}", message)
-      .replaceAll("{from}", from);
+  const fill = (s) => String(s || "").replaceAll("{to}", to).replaceAll("{message}", message).replaceAll("{from}", from);
   const headers = { "Content-Type": "application/json" };
   if (sms.apiKey) headers["Authorization"] = `Bearer ${sms.apiKey}`;
   const body = JSON.stringify({ to, from, text: message });
-  const url = fill(sms.url);
   try {
-    const r = await fetch(url, { method: "POST", headers, body });
+    const r = await fetch(fill(sms.url), { method: "POST", headers, body });
     const text = await r.text().catch(() => "");
     return { ok: r.ok, status: r.status, body: text.slice(0, 300) };
   } catch (e) {
@@ -96,217 +185,250 @@ async function sendSMS(settings, to, message) {
   }
 }
 
-// ---------- Auth ----------
-app.post("/api/login", (req, res) => {
-  const { id, pwd } = req.body || {};
-  if (id === ADMIN_ID && pwd === ADMIN_PWD)
-    return res.json({ role: "admin", name: "Administrateur", id, approved: true, active: true });
-  const db = loadDB();
-  const u = db.users.find((x) => x.id === id && x.pwd === pwd);
-  if (u)
+app.use(express.json({ limit: "12mb" }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+app.post("/api/login", async (req, res) => {
+  try {
+    const { id, pwd } = req.body || {};
+    if (id === ADMIN_ID && pwd === ADMIN_PWD)
+      return res.json({ role: "admin", name: "Administrateur", id, approved: true, active: true });
+    const { rows } = await pool.query("SELECT * FROM users WHERE id=$1 AND pwd=$2", [id, pwd]);
+    if (!rows.length) return res.status(401).json({ error: "Identifiants invalides" });
+    const u = rows[0];
     return res.json({
-      role: u.role,
-      name: u.name,
-      phone: u.phone,
-      approved: u.approved,
-      active: vendorActive(u),
-      subscriptionUntil: u.subscriptionUntil || null,
+      role: u.role, name: u.name, phone: u.phone, id: u.id,
+      approved: u.approved, active: vendorActive(u),
+      subscriptionUntil: u.subscription_until || null,
     });
-  res.status(401).json({ error: "Identifiants invalides" });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-app.post("/api/register", (req, res) => {
-  const { id, pwd, name, phone, role } = req.body || {};
-  if (!id || !pwd || !name) return res.status(400).json({ error: "Champs requis" });
-  const db = loadDB();
-  if (db.users.find((u) => u.id === id)) return res.status(400).json({ error: "Identifiant déjà pris" });
-  const user = {
-    id,
-    pwd,
-    name,
-    phone: phone || "",
-    role: role || "client",
-    approved: role !== "vendeur",
-    subscriptionUntil: null,
-  };
-  db.users.push(user);
-  saveDB(db);
-  res.json({ ok: true, approved: user.approved });
+app.post("/api/register", async (req, res) => {
+  try {
+    const { id, pwd, name, phone } = req.body || {};
+    if (!id || !pwd || !name) return res.status(400).json({ error: "Champs requis" });
+    const exists = await pool.query("SELECT id FROM users WHERE id=$1", [id]);
+    if (exists.rows.length) return res.status(400).json({ error: "Identifiant déjà pris" });
+    await pool.query(
+      "INSERT INTO users (id,pwd,name,phone,role,approved) VALUES ($1,$2,$3,$4,'vendeur',false)",
+      [id, pwd, name, phone || ""]
+    );
+    res.json({ ok: true, approved: false });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-// ---------- Settings (admin) ----------
-app.get("/api/settings", (_req, res) => {
-  const s = loadDB().settings;
-  res.json({ companyName: s.companyName, subscriptionPrice: s.subscriptionPrice, sms: s.sms });
+// ─── Settings ────────────────────────────────────────────────────────────────
+app.get("/api/settings", async (_req, res) => {
+  try { res.json(await getSettings()); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
 });
-app.post("/api/settings", (req, res) => {
-  const db = loadDB();
-  const { companyName, subscriptionPrice, sms } = req.body || {};
-  if (companyName !== undefined) db.settings.companyName = companyName;
-  if (subscriptionPrice !== undefined) db.settings.subscriptionPrice = Number(subscriptionPrice) || 0;
-  if (sms) db.settings.sms = { ...db.settings.sms, ...sms };
-  saveDB(db);
-  res.json({ ok: true, settings: db.settings });
+
+app.post("/api/settings", async (req, res) => {
+  try {
+    const cur = await getSettings();
+    const { companyName, subscriptionPrice, sms } = req.body || {};
+    const newName  = companyName !== undefined ? companyName : cur.companyName;
+    const newPrice = subscriptionPrice !== undefined ? Number(subscriptionPrice) : cur.subscriptionPrice;
+    const newSms   = sms ? { ...cur.sms, ...sms } : cur.sms;
+    await pool.query(
+      "UPDATE settings SET company_name=$1, subscription_price=$2, sms_config=$3 WHERE id=1",
+      [newName, newPrice, JSON.stringify(newSms)]
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
+
 app.post("/api/settings/sms-test", async (req, res) => {
-  const db = loadDB();
-  const { to } = req.body || {};
-  const r = await sendSMS(db.settings, to, `${db.settings.companyName}: SMS de test ✓`);
-  res.json(r);
+  try {
+    const settings = await getSettings();
+    const r = await sendSMS(settings, req.body.to, `${settings.companyName}: SMS de test ✓`);
+    res.json(r);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-// ---------- Vendors admin ----------
-app.get("/api/vendors", (_req, res) => {
-  const db = loadDB();
-  res.json(
-    db.users
-      .filter((u) => u.role === "vendeur")
-      .map((u) => ({
-        id: u.id,
-        name: u.name,
-        phone: u.phone,
-        approved: u.approved,
-        subscriptionUntil: u.subscriptionUntil || null,
-        active: vendorActive(u),
-      }))
-  );
+// ─── Vendors ─────────────────────────────────────────────────────────────────
+app.get("/api/vendors", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM users WHERE role='vendeur' ORDER BY created_at DESC");
+    res.json(rows.map(u => ({
+      id: u.id, name: u.name, phone: u.phone,
+      approved: u.approved, subscriptionUntil: u.subscription_until || null,
+      active: vendorActive(u),
+    })));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
-app.post("/api/vendors/approve", (req, res) => {
-  const db = loadDB();
-  const u = db.users.find((x) => x.id === req.body.id);
-  if (u) {
-    u.approved = true;
-    saveDB(db);
-  }
-  res.json({ ok: true });
+
+app.post("/api/vendors/approve", async (req, res) => {
+  try {
+    await pool.query("UPDATE users SET approved=true WHERE id=$1", [req.body.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
-// Activer l'abonnement : prolonge de N mois (paiement reçu)
-app.post("/api/vendors/activate", (req, res) => {
-  const db = loadDB();
-  const months = Number(req.body.months) || 1;
-  const u = db.users.find((x) => x.id === req.body.id);
-  if (u) {
-    u.approved = true;
-    const base = vendorActive(u) ? new Date(u.subscriptionUntil) : new Date();
+
+app.post("/api/vendors/activate", async (req, res) => {
+  try {
+    const months = Number(req.body.months) || 1;
+    const { rows } = await pool.query("SELECT * FROM users WHERE id=$1", [req.body.id]);
+    if (!rows.length) return res.json({ ok: false });
+    const u = rows[0];
+    const base = vendorActive(u) ? new Date(u.subscription_until) : new Date();
     base.setMonth(base.getMonth() + months);
-    u.subscriptionUntil = base.toISOString();
-    saveDB(db);
-  }
-  res.json({ ok: true, subscriptionUntil: u && u.subscriptionUntil });
-});
-// Désactiver : pas payé -> articles cachés
-app.post("/api/vendors/deactivate", (req, res) => {
-  const db = loadDB();
-  const u = db.users.find((x) => x.id === req.body.id);
-  if (u) {
-    u.subscriptionUntil = null;
-    saveDB(db);
-  }
-  res.json({ ok: true });
+    await pool.query(
+      "UPDATE users SET approved=true, subscription_until=$1 WHERE id=$2",
+      [base.toISOString(), req.body.id]
+    );
+    res.json({ ok: true, subscriptionUntil: base.toISOString() });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-// ---------- Products ----------
-app.get("/api/products", (_req, res) => {
-  const db = loadDB();
-  res.json(db.products.filter((p) => productVisible(p, db)));
-});
-app.get("/api/products/all", (_req, res) => res.json(loadDB().products));
-app.get("/api/products/mine/:ownerId", (req, res) => {
-  const db = loadDB();
-  res.json(db.products.filter((p) => p.ownerId === req.params.ownerId));
-});
-app.post("/api/products", (req, res) => {
-  const db = loadDB();
-  const b = req.body || {};
-  const stock = Number(b.stock) || 0;
-  const isAdmin = b.ownerRole === "admin";
-  const p = {
-    id: Date.now(),
-    title: b.title,
-    category: b.category,
-    price: Number(b.price) || 0,
-    oldPrice: b.oldPrice ? Number(b.oldPrice) : null,
-    stock,
-    stockInit: stock,
-    image: b.image || null,
-    description: b.description || "",
-    whatsapp: b.whatsapp || "",
-    personalPhone: b.personalPhone || "",
-    ownerId: b.ownerId,
-    ownerName: b.ownerName || "",
-    ownerRole: b.ownerRole || "vendeur",
-    approved: isAdmin ? true : false, // l'admin publie directement, le vendeur attend validation
-    blocked: false,
-  };
-  db.products.push(p);
-  saveDB(db);
-  res.json(p);
-});
-app.post("/api/products/approve", (req, res) => {
-  const db = loadDB();
-  const p = db.products.find((x) => x.id === Number(req.body.id));
-  if (p) {
-    p.approved = true;
-    p.blocked = false;
-    saveDB(db);
-  }
-  res.json({ ok: true });
-});
-app.post("/api/products/block", (req, res) => {
-  const db = loadDB();
-  const p = db.products.find((x) => x.id === Number(req.body.id));
-  if (p) {
-    p.blocked = true;
-    saveDB(db);
-  }
-  res.json({ ok: true });
-});
-app.post("/api/products/delete", (req, res) => {
-  const db = loadDB();
-  db.products = db.products.filter((x) => x.id !== Number(req.body.id));
-  saveDB(db);
-  res.json({ ok: true });
+app.post("/api/vendors/deactivate", async (req, res) => {
+  try {
+    await pool.query("UPDATE users SET subscription_until=NULL WHERE id=$1", [req.body.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-// ---------- Orders ----------
-app.get("/api/orders", (_req, res) => res.json(loadDB().orders));
+app.post("/api/vendors/delete", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM users WHERE id=$1", [req.body.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── Products ─────────────────────────────────────────────────────────────────
+app.get("/api/products", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM products ORDER BY created_at DESC");
+    const products = rows.map(rowToProduct);
+    const visible = [];
+    for (const p of products) {
+      if (await productVisible(p)) visible.push(p);
+    }
+    res.json(visible);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.get("/api/products/all", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM products ORDER BY created_at DESC");
+    res.json(rows.map(rowToProduct));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.get("/api/products/mine/:ownerId", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM products WHERE owner_id=$1 ORDER BY created_at DESC", [req.params.ownerId]);
+    res.json(rows.map(rowToProduct));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/products", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const id = Date.now();
+    const stock = Number(b.stock) || 0;
+    const isAdmin = b.ownerRole === "admin";
+    await pool.query(
+      `INSERT INTO products
+        (id,title,category,price,old_price,stock,stock_init,image,description,
+         whatsapp,personal_phone,owner_id,owner_name,owner_role,approved,blocked,
+         employer,job_location,contract_type,salary,deadline)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,$16,$17,$18,$19,$20)`,
+      [
+        id, b.title, b.category, Number(b.price)||0,
+        b.oldPrice ? Number(b.oldPrice) : null,
+        stock, stock, b.image||null, b.description||"",
+        b.whatsapp||"", b.personalPhone||"",
+        b.ownerId, b.ownerName||"", b.ownerRole||"vendeur",
+        isAdmin,
+        b.employer||"", b.jobLocation||"", b.contractType||"",
+        b.salary||"", b.deadline||"",
+      ]
+    );
+    const { rows } = await pool.query("SELECT * FROM products WHERE id=$1", [id]);
+    res.json(rowToProduct(rows[0]));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/products/approve", async (req, res) => {
+  try {
+    await pool.query("UPDATE products SET approved=true, blocked=false WHERE id=$1", [Number(req.body.id)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/products/block", async (req, res) => {
+  try {
+    await pool.query("UPDATE products SET blocked=true WHERE id=$1", [Number(req.body.id)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/products/delete", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM products WHERE id=$1", [Number(req.body.id)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+app.get("/api/orders", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM orders ORDER BY created_at DESC");
+    res.json(rows.map(rowToOrder));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
 app.post("/api/orders", async (req, res) => {
-  const db = loadDB();
-  const orderNo = "CMD-" + Date.now().toString().slice(-6);
-  const o = { id: Date.now(), orderNo, createdAt: new Date().toISOString(), ...req.body };
+  try {
+    const id = Date.now();
+    const orderNo = "CMD-" + String(id).slice(-6);
+    const b = req.body || {};
 
-  // Sauvegarder la commande dans la base
-  db.orders = db.orders || [];
-  db.orders.push(o);
+    await pool.query(
+      `INSERT INTO orders (id,order_no,client_name,client_phone,delivery,items,total,pay_method,pay_num)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, orderNo, b.name||"", b.phone||"", b.delivery||"",
+       JSON.stringify(b.items||[]), Number(b.total)||0,
+       b.payMethod||"", b.payNum||""]
+    );
 
-  // décrémente le stock + notifie chaque propriétaire d'article par SMS
-  const owners = {}; // personalPhone -> {names:[]}
-  for (const it of o.items || []) {
-    const p = db.products.find((x) => x.id === Number(it.id));
-    if (p) {
-      if (typeof p.stock === "number") p.stock = Math.max(0, p.stock - (it.qty || 1));
-      const phone = p.personalPhone || p.whatsapp || "";
-      if (phone) {
-        owners[phone] = owners[phone] || [];
-        owners[phone].push(`${it.qty}x ${p.title}`);
+    // Décrémente le stock
+    const owners = {};
+    for (const it of b.items || []) {
+      const { rows } = await pool.query("SELECT * FROM products WHERE id=$1", [Number(it.id)]);
+      if (rows[0]) {
+        const p = rows[0];
+        await pool.query("UPDATE products SET stock=GREATEST(0,stock-$1) WHERE id=$2", [it.qty||1, p.id]);
+        const phone = p.personal_phone || p.whatsapp || "";
+        if (phone) {
+          owners[phone] = owners[phone] || [];
+          owners[phone].push(`${it.qty}x ${p.title}`);
+        }
       }
     }
-  }
-  saveDB(db);
 
-  // SMS aux propriétaires (en-tête = nom entreprise + n° commande)
-  const company = db.settings.companyName || "ABENGOUROU-MARKET";
-  const mode = o.delivery === "agence" ? "Retrait sur place" : "Livraison domicile";
-  const smsResults = [];
-  for (const [phone, articles] of Object.entries(owners)) {
-    const message = `${company} - ${o.orderNo}\nNouvelle commande: ${articles.join(", ")}\nClient: ${o.name || ""} ${o.phone || ""}\n${mode}\nTotal: ${o.total || 0} FCFA`;
-    smsResults.push(await sendSMS(db.settings, phone, message));
-  }
+    // SMS propriétaires
+    const settings = await getSettings();
+    const mode = b.delivery === "agence" ? "Retrait sur place" : "Livraison domicile";
+    const smsResults = [];
+    for (const [phone, articles] of Object.entries(owners)) {
+      const msg = `${settings.companyName} - ${orderNo}\nNouvelle commande: ${articles.join(", ")}\nClient: ${b.name||""} ${b.phone||""}\n${mode}\nTotal: ${b.total||0} FCFA`;
+      smsResults.push(await sendSMS(settings, phone, msg));
+    }
 
-  res.json({ ...o, smsResults });
+    await pool.query("UPDATE orders SET sms_results=$1 WHERE id=$2", [JSON.stringify(smsResults), id]);
+
+    res.json({ id, orderNo, ...b, smsResults, createdAt: new Date().toISOString() });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
-// SPA fallback
+// ─── SPA fallback ─────────────────────────────────────────────────────────────
 app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
-app.listen(PORT, () => console.log(`ABENGOUROU-MARKET sur http://localhost:${PORT}`));
+// ─── Démarrage ────────────────────────────────────────────────────────────────
+initDB()
+  .then(() => app.listen(PORT, () => console.log(`ABENGOUROU-MARKET sur http://localhost:${PORT}`)))
+  .catch((err) => { console.error("❌ Erreur DB:", err.message); process.exit(1); });

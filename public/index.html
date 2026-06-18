@@ -15,7 +15,7 @@
 <!-- TOP STRIP -->
 <div class="top-strip">
   <div class="container top-strip-inner">
-    <span>🛒 Vendez sur ABENGOUROU-MARKET &nbsp;|&nbsp; 📍 Abengourou, Côte d'Ivoire &nbsp;|&nbsp; 🚚 Livraison rapide</span>
+    <span>📍 Abengourou, Côte d'Ivoire &nbsp;|&nbsp; 🕐 Lun–Sam 08h–18h &nbsp;|&nbsp; 📞 +225 XX XX XX XX XX</span>
     <div class="top-strip-right">
       <a href="#" onclick="showText('apropos');return false">À propos</a>
       <a href="#" onclick="showText('contact');return false">Contact</a>
@@ -43,7 +43,6 @@
       <input id="searchInput" placeholder="Chercher un produit, emploi, terrain…" autocomplete="off" />
       <button class="search-btn" onclick="doSearch()">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <span class="search-btn-lbl">Rechercher</span>
       </button>
     </div>
     <div class="header-actions">
@@ -102,6 +101,15 @@
     <div class="shortcuts-wrap">
       <div class="shortcuts" id="shortcuts"></div>
     </div>
+
+    <!-- OFFRES FLASH -->
+    <section class="section-block flash-section">
+      <div class="section-head">
+        <h2>⚡ Offres Flash du Jour</h2>
+        <a href="#" class="see-all" onclick="filterCat('');return false">Voir tout →</a>
+      </div>
+      <div class="products-grid" id="flashGrid"></div>
+    </section>
 
     <!-- BOUTIQUE -->
     <section class="section-block">

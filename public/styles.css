@@ -1,12 +1,12 @@
 /* ===== VARIABLES ===== */
 :root {
-  --primary: #F68B1E;       /* Jumia orange */
-  --primary-d: #CF6F15;
-  --primary-light: #FEF1E2;
+  --primary: #F57C00;
+  --primary-d: #E65100;
+  --primary-light: #FFF3E0;
   --secondary: #2E7D32;
   --secondary-light: #E8F5E9;
-  --accent: #F68B1E;
-  --bg: #EDEDED;            /* Jumia light grey page bg */
+  --accent: #FFD600;
+  --bg: #F5F5F5;
   --card: #fff;
   --text: #212121;
   --muted: #757575;
@@ -29,34 +29,33 @@ input, select, textarea { font-family: inherit; }
 .container { max-width: 1280px; margin: 0 auto; padding: 0 14px; }
 
 /* ===== TOP STRIP ===== */
-.top-strip { background: #F7F7F7; color: #555; font-size: 12px; border-bottom: 1px solid #ECECEC; }
-.top-strip-inner { display: flex; justify-content: space-between; align-items: center; padding: 7px 14px; }
+.top-strip { background: #212121; color: #bdbdbd; font-size: 12px; }
+.top-strip-inner { display: flex; justify-content: space-between; align-items: center; padding: 6px 14px; }
 .top-strip-right { display: flex; gap: 16px; }
-.top-strip-right a { color: #555; font-weight: 500; }
-.top-strip-right a:hover { color: var(--primary); }
+.top-strip-right a { color: #bdbdbd; }
+.top-strip-right a:hover { color: #fff; }
 @media (max-width:640px) { .top-strip { display: none; } }
 
 /* ===== HEADER ===== */
-header { background: #fff; position: sticky; top: 0; z-index: 200; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
-.header-inner { display: flex; align-items: center; gap: 14px; padding: 12px 14px; }
+header { background: var(--primary); position: sticky; top: 0; z-index: 200; }
+.header-inner { display: flex; align-items: center; gap: 14px; padding: 8px 14px; }
 .logo-wrap { flex-shrink: 0; }
-.logo-img { height: 48px; width: auto; object-fit: contain; }
-.search-wrap { flex: 1; display: flex; background: #fff; border-radius: var(--radius); overflow: hidden; border: 1.5px solid #D6D6D6; min-width: 0; transition: border-color .2s; }
-.search-wrap:focus-within { border-color: var(--primary); }
+.logo-img { height: 52px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+.search-wrap { flex: 1; display: flex; background: #fff; border-radius: var(--radius); overflow: hidden; border: 2px solid var(--accent); min-width: 0; }
 .search-cat-sel { border: none; border-right: 1px solid var(--border); padding: 0 10px; font-size: 12px; color: var(--text); background: #f9f9f9; cursor: pointer; display: none; }
 @media (min-width:768px) { .search-cat-sel { display: block; } }
-.search-wrap input { flex: 1; padding: 11px 14px; border: none; outline: none; font-size: 14px; color: var(--text); min-width: 0; }
-.search-btn { background: var(--primary); color: #fff; padding: 0 24px; font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 14px; transition: background .2s; }
-.search-btn:hover { background: var(--primary-d); }
-.header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.hbtn { background: transparent; color: var(--text); padding: 8px 12px; border-radius: var(--radius); display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; transition: all .2s; position: relative; }
-.hbtn:hover { background: var(--primary-light); color: var(--primary); }
+.search-wrap input { flex: 1; padding: 10px 12px; border: none; outline: none; font-size: 14px; color: var(--text); min-width: 0; }
+.search-btn { background: var(--accent); color: var(--text); padding: 0 18px; font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 14px; transition: background .2s; }
+.search-btn:hover { background: #f9c200; }
+.header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.hbtn { background: rgba(255,255,255,.15); color: #fff; padding: 8px 12px; border-radius: var(--radius); display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; transition: background .2s; position: relative; }
+.hbtn:hover { background: rgba(255,255,255,.25); }
 .hbtn-lbl { display: none; }
 @media (min-width:900px) { .hbtn-lbl { display: inline; } }
-.cart-badge { background: var(--primary); color: #fff; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 10px; min-width: 20px; text-align: center; }
+.cart-badge { background: var(--accent); color: #000; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 10px; min-width: 20px; text-align: center; }
 .menu-btn-mob { display: flex; }
 @media (min-width:1024px) { .menu-btn-mob { display: none; } }
-.flag-bar { height: 4px; background: linear-gradient(90deg,#FF6B00 33%,#fff 33% 66%,#2E7D32 66%); }
+.flag-bar { height: 5px; background: linear-gradient(90deg,#FF6B00 33%,#fff 33% 66%,#2E7D32 66%); }
 
 /* ===== CAT NAV ===== */
 .cat-nav { background: #fff; border-bottom: 1px solid var(--border); display: none; }
@@ -359,7 +358,7 @@ footer { background: #212121; color: #bdbdbd; margin-top: 40px; }
 .footer-col ul { list-style: none; }
 .footer-col li { padding: 5px 0; font-size: 13px; }
 .footer-col a:hover { color: var(--primary); }
-.footer-brand .footer-logo { height: 56px; margin-bottom: 12px; filter: brightness(0) invert(1); opacity: .85; }
+.footer-brand .footer-logo { height: 56px; margin-bottom: 12px; border-radius: 8px; }
 .footer-brand p { font-size: 13px; line-height: 1.6; }
 .social-links { display: flex; gap: 8px; margin-top: 14px; }
 .social-links a { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; transition: all .2s; }
@@ -442,25 +441,3 @@ footer { background: #212121; color: #bdbdbd; margin-top: 40px; }
 .pf-section { animation: fadeIn .2s ease; }
 .pf-job { background: #F8F9FF; border: 1.5px solid #C7D2FE; border-radius: var(--radius-lg); padding: 14px; margin: 10px 0; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-
-/* ===== JUMIA-STYLE TWEAKS ===== */
-.search-btn-lbl { display: none; }
-@media (min-width: 768px) { .search-btn-lbl { display: inline; } }
-@media (max-width: 767px) { .search-btn { padding: 0 14px; } }
-
-/* Discount badge like Jumia (top-left, orange) */
-.pcard-badge { background: var(--primary); color: #fff; font-weight: 800; }
-/* Price + stock Jumia look */
-.pcard-price { color: var(--text); }
-.pcard-stock { color: var(--primary); font-weight: 600; }
-.stock-bar span { background: var(--primary); }
-
-/* Section heading underline = Jumia orange accent */
-.section-head { border-bottom-color: var(--primary); }
-.see-all { color: var(--primary); font-weight: 600; font-size: 13px; }
-.see-all:hover { text-decoration: underline; }
-
-/* "Toutes les catégories" launcher like Jumia (orange) */
-.cat-nav-all { background: var(--primary); }
-.cat-nav-all:hover { background: var(--primary-d); }
-.cat-nav-links a:hover { color: var(--primary); border-bottom-color: var(--primary); }

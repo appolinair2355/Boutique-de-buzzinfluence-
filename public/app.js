@@ -35,63 +35,6 @@ const BANNERS = [
   { bg: "linear-gradient(135deg,#C62828 0%,#B71C1C 100%)", title: "⚡ Offres Flash du Jour", sub: "Profitez des meilleures promotions — stocks limités !", cta: "Voir les offres flash" },
 ];
 
-const FLASH = [
-  {id:"f1",name:"Téléphone Tecno Spark 20",price:95000,oldPrice:130000,stock:12,stockInit:50,emoji:"📱"},
-  {id:"f2",name:"Ordinateur HP 15 · 8Go RAM",price:280000,oldPrice:350000,stock:5,stockInit:20,emoji:"💻"},
-  {id:"f3",name:"Moto Apsonic AP150",price:650000,oldPrice:750000,stock:3,stockInit:10,emoji:"🏍️"},
-  {id:"f4",name:"Robe Wax Premium",price:12000,oldPrice:18000,stock:28,stockInit:60,emoji:"👗"},
-  {id:"f5",name:"Sac de riz 25kg",price:18500,oldPrice:21000,stock:45,stockInit:100,emoji:"🌾"},
-  {id:"f6",name:"Casque Bluetooth JBL",price:22000,oldPrice:30000,stock:8,stockInit:25,emoji:"🎧"},
-  {id:"f7",name:"TV Samsung 43 pouces",price:185000,oldPrice:240000,stock:4,stockInit:15,emoji:"📺"},
-  {id:"f8",name:"Climatiseur 1.5CV",price:245000,oldPrice:290000,stock:6,stockInit:20,emoji:"❄️"},
-];
-
-const CONCOURS = [
-  {n:"INSFS",t:"Inscriptions ouvertes"},{n:"INFAS",t:"Session 2026"},
-  {n:"ENA",t:"Résultats publiés"},{n:"Police Nationale",t:"Dossiers reçus"},
-  {n:"Gendarmerie",t:"En cours"},{n:"Douanes CI",t:"Préparation"},
-  {n:"Eaux & Forêts",t:"Annoncé"},{n:"Fonction Publique",t:"Nouveau concours"},
-];
-const JOBS = [
-  {t:"Comptable Sénior",c:"PME Abengourou",s:"350 000 FCFA/mois"},
-  {t:"Chauffeur Livreur",c:"Transport Express CI",s:"180 000 FCFA/mois"},
-  {t:"Commercial Terrain",c:"Distrib+",s:"Commission + salaire"},
-  {t:"Infirmier(ère)",c:"Clinique Espoir",s:"Selon profil"},
-  {t:"Enseignant Maths",c:"Collège Privé",s:"À négocier"},
-  {t:"Agent de Sécurité",c:"SecuriPro CI",s:"160 000 FCFA/mois"},
-  {t:"Caissier(ère)",c:"Supermarché Marché Central",s:"Temps plein"},
-  {t:"Technicien Réseau",c:"Startup TechAbgr",s:"300 000 FCFA/mois"},
-];
-const REAL = [
-  {t:"Terrain 500m²",p:"8 000 000 FCFA",l:"Aniassué",e:"🌳"},
-  {t:"Villa 4 pièces",p:"45 000 000 FCFA",l:"Résidentiel",e:"🏡"},
-  {t:"Studio meublé",p:"75 000 FCFA/mois",l:"Centre-ville",e:"🛏️"},
-  {t:"Magasin commercial",p:"200 000 FCFA/mois",l:"Grand marché",e:"🏬"},
-  {t:"Appartement 3 pièces",p:"110 000 FCFA/mois",l:"Quartier Lycée",e:"🏢"},
-  {t:"Parcelle viabilisée",p:"5 500 000 FCFA",l:"Lotissement SICOGI",e:"📐"},
-];
-const TRANSPORT = [
-  {n:"Réservation Taxi",e:"🚖",d:"Taxi rapide, disponible 24h/24"},
-  {n:"Moto Taxi",e:"🛵",d:"Livraison rapide en ville"},
-  {n:"Livraison Colis",e:"📦",d:"Envoi de colis en Côte d'Ivoire"},
-];
-const RESTO = [
-  {n:"Chez Tantie Adjoua",s:"Attiéké poisson braisé",p:"1 500 FCFA",e:"🐟"},
-  {n:"Maquis Le Baoulé",s:"Poulet braisé + frites",p:"3 500 FCFA",e:"🍗"},
-  {n:"Fast-food Le Délice",s:"Burger américain + frites",p:"2 500 FCFA",e:"🍔"},
-  {n:"Restaurant L'Indénié",s:"Menu du jour complet",p:"2 000 FCFA",e:"🍛"},
-  {n:"Boulangerie Centrale",s:"Pains & viennoiseries",p:"300 FCFA",e:"🥐"},
-  {n:"Bar Maquis Le Paradis",s:"Poisson frit & alloco",p:"2 800 FCFA",e:"🐠"},
-];
-const NEWS = [
-  {c:"Politique",t:"Le maire annonce de nouveaux projets urbains pour 2026",d:"Aujourd'hui"},
-  {c:"Économie",t:"Hausse du prix du cacao : les planteurs satisfaits",d:"Hier"},
-  {c:"Éducation",t:"Rentrée scolaire : 12 nouvelles salles inaugurées dans 5 écoles",d:"Il y a 2 jours"},
-  {c:"Culture",t:"Festival des arts d'Abengourou : programme 2026 dévoilé",d:"Il y a 3 jours"},
-  {c:"Sport",t:"L'AS Indénié remporte le tournoi régional de football",d:"Il y a 4 jours"},
-  {c:"Société",t:"Campagne de salubrité : la ville se mobilise pour le nettoyage",d:"Il y a 5 jours"},
-  {c:"Santé",t:"Campagne de vaccination : 3 000 personnes touchées en une semaine",d:"Il y a 1 semaine"},
-];
 
 const ADMIN_PHONE = "22901679240076";
 const fmt = n => Number(n).toLocaleString("fr-FR") + " FCFA";
@@ -293,64 +236,94 @@ function renderHome() {
   renderCatNav();
   renderCarousel();
 
-  // shortcuts
   document.getElementById("shortcuts").innerHTML = SHORTCUTS.map(([i,n,cat]) =>
     `<a href="#" class="shortcut" onclick="filterCat('${cat}');return false;"><span class="ico">${i}</span><span>${n}</span></a>`
   ).join("");
 
-  // concours + emploi: chargés depuis l'API
+  loadFlashSection();
   loadPaidSection("concoursGrid", "concours-ci", "📚");
   loadPaidSection("jobsGrid", "emploi", "💼");
-
-  // real estate
-  document.getElementById("realGrid").innerHTML = REAL.map(r =>
-    `<div class="pcard">
-      <div class="pcard-img" style="background:linear-gradient(135deg,#E8F5E9,#C8E6C9);font-size:52px">${r.e}</div>
-      <div class="pcard-body">
-        <div class="pcard-name">${r.t}</div>
-        <div class="pcard-seller">📍 ${r.l}</div>
-        <div class="pcard-price" style="color:var(--secondary)">${r.p}</div>
-        <div class="pcard-actions">
-          <button class="btn-add" style="background:var(--secondary)" onclick="window.open('https://wa.me/${ADMIN_PHONE}?text='+encodeURIComponent('Bonjour, intéressé par : ${r.t} (${r.p})'),'_blank')">Contacter</button>
-        </div>
-      </div>
-    </div>`
-  ).join("");
-
-  // transport
-  document.getElementById("transportGrid").innerHTML = TRANSPORT.map(t =>
-    `<div class="transport-card">
-      <div class="t-ico">${t.e}</div>
-      <h4>${t.n}</h4>
-      <p style="font-size:12px;color:var(--muted);margin-top:4px">${t.d}</p>
-      <button class="btn-add" style="display:block;width:100%;margin-top:12px;border-radius:20px" onclick='addCart({id:"tr-${t.n}",name:"${t.n}",price:1000,emoji:"${t.e}"})'>Commander</button>
-    </div>`
-  ).join("");
-
-  // restaurants
-  document.getElementById("restoGrid").innerHTML = RESTO.map(r =>
-    `<div class="pcard">
-      <div class="pcard-img" style="background:linear-gradient(135deg,#FFF3E0,#FFE0B2);font-size:52px">${r.e}</div>
-      <div class="pcard-body">
-        <div class="pcard-name">${r.n}</div>
-        <div class="pcard-seller">${r.s}</div>
-        <div class="pcard-price">${r.p}</div>
-        <div class="pcard-actions">
-          <button class="btn-add" onclick='addCart({id:"rst-${r.n}",name:"${r.n} · ${r.s}",price:${parseInt(r.p.replace(/\D/g,""))||2000},emoji:"${r.e}"})'>Commander</button>
-        </div>
-      </div>
-    </div>`
-  ).join("");
-
-  // news
-  document.getElementById("newsList").innerHTML = NEWS.map(n =>
-    `<li>
-      <span class="news-cat">${n.c}</span>
-      <div class="news-txt"><h5>${n.t}</h5><span>${n.d}</span></div>
-    </li>`
-  ).join("");
-
+  loadCatSection("realGrid", "immobilier", "🏠", "Aucun bien immobilier disponible.", "products-grid");
+  loadTransportSection();
+  loadCatSection("restoGrid", "restaurants", "🍽️", "Aucun restaurant disponible.", "products-grid");
+  loadNewsSection();
   loadShop();
+}
+
+// Offres flash = produits avec remise publiés (oldPrice > price)
+async function loadFlashSection() {
+  const el = document.getElementById("flashGrid");
+  if (!el) return;
+  let products = [];
+  try {
+    const all = await (await fetch("/api/products")).json();
+    products = all.filter(p => p.oldPrice && Number(p.oldPrice) > Number(p.price) && !PAID_CATS.has(p.category));
+  } catch {}
+  if (!products.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-ico">⚡</div><p>Aucune offre flash pour le moment.</p></div>`;
+    return;
+  }
+  el.innerHTML = products.map(p => productCard({...p, name:p.title}, true)).join("");
+}
+
+// Charge une catégorie depuis l'API dans une grille
+async function loadCatSection(gridId, category, icon, emptyMsg, gridClass) {
+  const el = document.getElementById(gridId);
+  if (!el) return;
+  let products = [];
+  try {
+    const all = await (await fetch("/api/products")).json();
+    products = all.filter(p => p.category === category);
+  } catch {}
+  if (!products.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-ico">${icon}</div><p>${emptyMsg}</p></div>`;
+    return;
+  }
+  el.className = gridClass;
+  el.innerHTML = products.map(p => productCard({...p, name:p.title})).join("");
+}
+
+// Transport depuis l'API
+async function loadTransportSection() {
+  const el = document.getElementById("transportGrid");
+  if (!el) return;
+  let products = [];
+  try {
+    const all = await (await fetch("/api/products")).json();
+    products = all.filter(p => p.category === "transport");
+  } catch {}
+  if (!products.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-ico">🚕</div><p>Aucune offre de transport pour le moment.</p></div>`;
+    return;
+  }
+  el.innerHTML = products.map(p => `
+    <div class="transport-card">
+      <div class="t-ico">${p.image ? `<img src="${p.image}" style="width:60px;height:60px;object-fit:cover;border-radius:50%">` : "🚕"}</div>
+      <h4>${p.title}</h4>
+      <p style="font-size:12px;color:var(--muted);margin-top:4px">${p.description||""}</p>
+      <button class="btn-add" style="display:block;width:100%;margin-top:12px;border-radius:20px"
+        onclick='addCart({id:${p.id},name:"${p.title.replace(/"/g,"&quot;")}",price:${p.price},emoji:"🚕"})'>Commander</button>
+    </div>`).join("");
+}
+
+// Actualités depuis l'API
+async function loadNewsSection() {
+  const el = document.getElementById("newsList");
+  if (!el) return;
+  let products = [];
+  try {
+    const all = await (await fetch("/api/products")).json();
+    products = all.filter(p => p.category === "actualites");
+  } catch {}
+  if (!products.length) {
+    el.innerHTML = `<li style="list-style:none;padding:20px;text-align:center;color:var(--muted)">📰 Aucune actualité pour le moment.</li>`;
+    return;
+  }
+  el.innerHTML = products.map(p => `
+    <li>
+      <span class="news-cat">Actualité</span>
+      <div class="news-txt"><h5>${p.title}</h5><span>${new Date(p.createdAt||Date.now()).toLocaleDateString("fr-FR")}</span></div>
+    </li>`).join("");
 }
 
 // ============ LOAD SHOP (API) ============
@@ -389,9 +362,44 @@ async function loadPaidSection(gridId, category, icon) {
 }
 
 // ============ SEARCH ============
-function doSearch() {
-  const q = document.getElementById("searchInput").value.trim();
-  if (q) toast(`Recherche : "${q}"`);
+async function doSearch() {
+  const q = document.getElementById("searchInput").value.trim().toLowerCase();
+  const cat = document.getElementById("searchCat").value;
+  if (!q && !cat) return toast("Entrez un mot-clé ou choisissez une catégorie", "red");
+
+  showPage("page-category");
+  const wrap = document.getElementById("catPageContent");
+  const label = cat ? (CATEGORIES.find(c=>c[0]===cat)?.[2]||cat) : `"${q}"`;
+  wrap.innerHTML = `
+    <div class="cat-page-header">
+      <span class="cat-page-icon">🔍</span>
+      <div><h2>Résultats : ${label}</h2><p>Recherche en cours…</p></div>
+    </div>
+    <div class="section-block"><div class="loading-placeholder"><div class="spinner"></div><p>Chargement…</p></div></div>`;
+
+  let all = [];
+  try { all = await (await fetch("/api/products")).json(); } catch {}
+
+  let results = all;
+  if (cat) results = results.filter(p => p.category === cat);
+  if (q) results = results.filter(p =>
+    p.title?.toLowerCase().includes(q) ||
+    p.description?.toLowerCase().includes(q) ||
+    p.ownerName?.toLowerCase().includes(q) ||
+    p.category?.toLowerCase().includes(q)
+  );
+
+  if (!results.length) {
+    wrap.querySelector(".section-block").innerHTML =
+      `<div class="empty-state"><div class="empty-ico">🔍</div><p>Aucun résultat pour <strong>${label}</strong>.</p></div>`;
+    return;
+  }
+  wrap.querySelector("p").textContent = `${results.length} résultat${results.length>1?"s":""}`;
+  wrap.querySelector(".section-block").innerHTML = `
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">${results.length} résultat${results.length>1?"s":""}</div>
+    <div class="products-grid">
+      ${results.map(p => PAID_CATS.has(p.category) ? paidListingCard(p) : productCard({...p,name:p.title})).join("")}
+    </div>`;
 }
 document.addEventListener("keydown", e => {
   if (e.key === "Enter" && document.activeElement.id === "searchInput") doSearch();
@@ -759,16 +767,15 @@ function showVendeur() {
   const banner = document.getElementById("subBanner");
   if (banner) {
     banner.innerHTML = USER.active
-      ? `<div class="sub-active">✅ Abonnement actif${USER.subscriptionUntil ? " jusqu'au " + new Date(USER.subscriptionUntil).toLocaleDateString("fr-FR") : ""}. Vos articles sont visibles.</div>`
-      : `<div class="sub-inactive">⚠️ Abonnement inactif ou expiré — vous pouvez naviguer normalement, mais la publication d'articles est suspendue jusqu'au renouvellement de votre abonnement.</div>`;
+      ? `<div class="sub-active">✅ Compte actif — vos articles sont visibles sur la plateforme.</div>`
+      : `<div class="sub-inactive">⏳ Compte en attente de validation par l'administrateur.</div>`;
   }
-  // Bloquer uniquement la publication si abonnement inactif
   const form = document.getElementById("productForm");
   if (form) {
     const submitBtn = form.querySelector("button[type=submit]");
     if (submitBtn) {
       submitBtn.disabled = !USER.active;
-      submitBtn.title = USER.active ? "" : "Renouvelez votre abonnement pour publier";
+      submitBtn.title = USER.active ? "" : "En attente de validation par l'admin";
       submitBtn.style.opacity = USER.active ? "" : "0.5";
     }
   }
@@ -975,12 +982,9 @@ async function adminTab(which) {
       ${list.length === 0
         ? `<div class="empty-state"><div class="empty-ico">👥</div><p>Aucun vendeur inscrit.</p></div>`
         : list.map(v => {
-            const until = v.subscriptionUntil ? new Date(v.subscriptionUntil).toLocaleDateString("fr-FR") : "—";
             const statusBadge = v.active
-              ? `<span class="status-badge status-ok">✅ Actif · ${until}</span>`
-              : v.approved
-                ? `<span class="status-badge status-block">Inactif</span>`
-                : `<span class="status-badge status-wait">⏳ Non approuvé</span>`;
+              ? `<span class="status-badge status-ok">✅ Actif</span>`
+              : `<span class="status-badge status-wait">⏳ En attente</span>`;
             return `<div class="admin-row">
               <div class="admin-row-head">
                 <div>
@@ -991,8 +995,7 @@ async function adminTab(which) {
               </div>
               <div class="admin-row-actions">
                 ${!v.approved ? `<button class="btn btn-secondary btn-sm" onclick="approveVendor('${v.id}')">✓ Approuver</button>` : ""}
-                <button class="btn btn-primary btn-sm" onclick="activateVendor('${v.id}')">+ 1 mois</button>
-                <button class="btn btn-ghost btn-sm" onclick="deactivateVendor('${v.id}')">Désactiver</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteVendor('${v.id}')">🗑 Supprimer</button>
               </div>
             </div>`;
           }).join("")}`;
@@ -1086,10 +1089,6 @@ async function adminTab(which) {
               <input id="setCompany" value="${s.companyName || ""}" placeholder="ABENGOUROU-MARKET" />
               <div class="form-hint">Apparaît dans l'en-tête des SMS envoyés aux vendeurs.</div>
             </div>
-            <div class="form-group">
-              <label>Prix de l'abonnement vendeur (FCFA/mois)</label>
-              <input id="setSubPrice" type="number" value="${s.subscriptionPrice || 0}" placeholder="5000" />
-            </div>
           </div>
         </div>
 
@@ -1175,8 +1174,7 @@ function toggleSmsFields() {
 }
 
 async function approveVendor(id) { await fetch("/api/vendors/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Compte vendeur approuvé ✓","green"); adminTab("vendors"); }
-async function activateVendor(id) { await fetch("/api/vendors/activate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,months:1})}); toast("Abonnement +1 mois activé ✓","green"); adminTab("vendors"); }
-async function deactivateVendor(id) { await fetch("/api/vendors/deactivate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Vendeur désactivé",""); adminTab("vendors"); }
+async function deleteVendor(id) { if(!confirm("Supprimer ce compte vendeur ?"))return; await fetch("/api/vendors/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Vendeur supprimé",""); adminTab("vendors"); }
 async function approveProduct(id) { await fetch("/api/products/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Article validé ✓","green"); adminTab("products"); }
 async function blockProduct(id) { await fetch("/api/products/block",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Article bloqué"); adminTab("products"); }
 async function deleteProduct(id) { if(!confirm("Supprimer définitivement cet article ?"))return; await fetch("/api/products/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Article supprimé"); adminTab("products"); }
@@ -1184,7 +1182,6 @@ async function deleteProduct(id) { if(!confirm("Supprimer définitivement cet ar
 async function saveSettings() {
   const body = {
     companyName: document.getElementById("setCompany").value,
-    subscriptionPrice: document.getElementById("setSubPrice").value,
     sms: {
       enabled: document.getElementById("smsEnabled").checked,
       url: document.getElementById("smsUrl").value,

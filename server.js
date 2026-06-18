@@ -4,6 +4,8 @@
 const express = require("express");
 const path = require("path");
 const { Pool } = require("pg");
+const XLSX = require("xlsx");
+const multer = require("multer");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -77,8 +79,27 @@ async function initDB() {
       sms_config          JSONB DEFAULT '{}'
     );
 
+    CREATE TABLE IF NOT EXISTS rencontres (
+      id               BIGINT PRIMARY KEY,
+      nom              TEXT NOT NULL,
+      prenom           TEXT NOT NULL,
+      birthdate        TEXT NOT NULL,
+      profession       TEXT DEFAULT '',
+      ville            TEXT DEFAULT '',
+      quartier         TEXT DEFAULT '',
+      sexe             TEXT DEFAULT '',
+      whatsapp         TEXT DEFAULT '',
+      phone            TEXT DEFAULT '',
+      photo            TEXT,
+      description      TEXT DEFAULT '',
+      sous_cat         TEXT DEFAULT 'amitie',
+      prix_acces       NUMERIC DEFAULT 500,
+      approved         BOOLEAN DEFAULT FALSE,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    );
+
     INSERT INTO settings (id, company_name, subscription_price, sms_config)
-    VALUES (1, 'ABENGOUROU-MARKET', 5000,
+    VALUES (1, 'ABENGOUROU-MARKET.CI', 5000,
       '{"enabled":false,"method":"POST","url":"","contentType":"application/json","headers":"","bodyTemplate":"","sender":"ABGMARKET","apiKey":""}')
     ON CONFLICT (id) DO NOTHING;
   `);
@@ -422,6 +443,232 @@ app.post("/api/orders", async (req, res) => {
     await pool.query("UPDATE orders SET sms_results=$1 WHERE id=$2", [JSON.stringify(smsResults), id]);
 
     res.json({ id, orderNo, ...b, smsResults, createdAt: new Date().toISOString() });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── Rencontres ───────────────────────────────────────────────────────────────
+function calcAge(birthdate) {
+  const b = new Date(birthdate);
+  const n = new Date();
+  let age = n.getFullYear() - b.getFullYear();
+  if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) age--;
+  return age;
+}
+
+function rowToRencontrePublic(r) {
+  const initials = ((r.nom||"")[0]||"").toUpperCase() + "." + ((r.prenom||"")[0]||"").toUpperCase() + ".";
+  const title = (r.sexe||"").toLowerCase().startsWith("f") ? "Madame" : "Monsieur";
+  return {
+    id: Number(r.id),
+    displayName: `${title} ${initials}`,
+    age: calcAge(r.birthdate),
+    profession: r.profession || "",
+    ville: r.ville || "",
+    quartier: r.quartier || "",
+    sexe: r.sexe || "",
+    souscat: r.sous_cat || "amitie",
+    prixAcces: Number(r.prix_acces) || 500,
+    descShort: (r.description || "").slice(0, 150),
+    approved: r.approved,
+    createdAt: r.created_at,
+  };
+}
+
+function rowToRencontreAdmin(r) {
+  return {
+    ...rowToRencontrePublic(r),
+    nom: r.nom, prenom: r.prenom, birthdate: r.birthdate,
+    whatsapp: r.whatsapp || "", phone: r.phone || "",
+    photo: r.photo || null, description: r.description || "",
+  };
+}
+
+app.get("/api/rencontres", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM rencontres WHERE approved=true ORDER BY created_at DESC");
+    res.json(rows.map(rowToRencontrePublic));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.get("/api/rencontres/all", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM rencontres ORDER BY created_at DESC");
+    res.json(rows.map(rowToRencontreAdmin));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/rencontres", async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (!b.nom || !b.prenom || !b.birthdate) return res.status(400).json({ error: "Champs requis manquants" });
+    const id = Date.now();
+    await pool.query(
+      `INSERT INTO rencontres (id,nom,prenom,birthdate,profession,ville,quartier,sexe,whatsapp,phone,photo,description,sous_cat,prix_acces)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [id, b.nom, b.prenom, b.birthdate, b.profession||"", b.ville||"", b.quartier||"",
+       b.sexe||"", b.whatsapp||"", b.phone||"", b.photo||null, b.description||"",
+       b.souscat||"amitie", Number(b.prixAcces)||500]
+    );
+    res.json({ ok: true, id });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/rencontres/approve", async (req, res) => {
+  try {
+    await pool.query("UPDATE rencontres SET approved=true WHERE id=$1", [Number(req.body.id)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+app.post("/api/rencontres/delete", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM rencontres WHERE id=$1", [Number(req.body.id)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── EXPORT / IMPORT BASE DE DONNÉES ─────────────────────────────────────────
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+// Toutes les tables exportées (noms de table → colonnes à exclure pour la sécurité minimale)
+const EXPORT_TABLES = ["users", "products", "orders", "settings", "rencontres"];
+
+// Export JSON complet de toutes les tables
+app.get("/api/admin/export/json", async (req, res) => {
+  try {
+    const result = {};
+    for (const t of EXPORT_TABLES) {
+      const { rows } = await pool.query(`SELECT * FROM ${t} ORDER BY id`);
+      result[t] = rows;
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="abengourou-market-backup-${new Date().toISOString().slice(0,10)}.json"`);
+    res.send(JSON.stringify(result, null, 2));
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Export Excel multi-feuilles (une feuille par table)
+app.get("/api/admin/export/excel", async (req, res) => {
+  try {
+    const wb = XLSX.utils.book_new();
+    for (const t of EXPORT_TABLES) {
+      const { rows } = await pool.query(`SELECT * FROM ${t} ORDER BY id`);
+      if (!rows.length) {
+        // Feuille vide avec juste un header
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[`Aucune donnée dans ${t}`]]), t);
+        continue;
+      }
+      const ws = XLSX.utils.json_to_sheet(rows.map(r => {
+        const o = {};
+        for (const [k, v] of Object.entries(r)) {
+          o[k] = typeof v === "object" && v !== null ? JSON.stringify(v) : v;
+        }
+        return o;
+      }));
+      XLSX.utils.book_append_sheet(wb, ws, t);
+    }
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="abengourou-market-${new Date().toISOString().slice(0,10)}.xlsx"`);
+    res.send(buf);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Aperçu des comptages pour l'onglet admin
+app.get("/api/admin/db-stats", async (req, res) => {
+  try {
+    const stats = {};
+    for (const t of EXPORT_TABLES) {
+      const { rows } = await pool.query(`SELECT COUNT(*) FROM ${t}`);
+      stats[t] = Number(rows[0].count);
+    }
+    res.json(stats);
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Import JSON — réimporte les données (UPSERT par table)
+app.post("/api/admin/import/json", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Fichier manquant" });
+    const data = JSON.parse(req.file.buffer.toString("utf8"));
+    const report = {};
+
+    // users
+    if (data.users) {
+      let n = 0;
+      for (const u of data.users) {
+        await pool.query(`
+          INSERT INTO users (id,pwd,name,phone,email,role,approved,subscription_until,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          ON CONFLICT (id) DO UPDATE SET
+            pwd=EXCLUDED.pwd, name=EXCLUDED.name, phone=EXCLUDED.phone,
+            email=EXCLUDED.email, role=EXCLUDED.role, approved=EXCLUDED.approved,
+            subscription_until=EXCLUDED.subscription_until
+        `, [u.id,u.pwd,u.name||"",u.phone||"",u.email||"",u.role||"client",u.approved??false,u.subscription_until||null,u.created_at||new Date()]);
+        n++;
+      }
+      report.users = n;
+    }
+
+    // products
+    if (data.products) {
+      let n = 0;
+      for (const p of data.products) {
+        await pool.query(`
+          INSERT INTO products (id,name,description,price,old_price,category,sub_cat,images,stock,owner_id,owner_name,owner_phone,owner_role,approved,blocked,employer,job_location,contract_type,salary,deadline,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          ON CONFLICT (id) DO UPDATE SET
+            name=EXCLUDED.name, description=EXCLUDED.description, price=EXCLUDED.price,
+            old_price=EXCLUDED.old_price, category=EXCLUDED.category, images=EXCLUDED.images,
+            stock=EXCLUDED.stock, approved=EXCLUDED.approved, blocked=EXCLUDED.blocked
+        `, [p.id,p.name,p.description||"",Number(p.price)||0,Number(p.old_price)||0,
+            p.category||"",p.sub_cat||"",JSON.stringify(p.images||[]),Number(p.stock)||0,
+            p.owner_id||"",p.owner_name||"",p.owner_phone||"",p.owner_role||"client",
+            p.approved??false,p.blocked??false,
+            p.employer||"",p.job_location||"",p.contract_type||"",p.salary||"",p.deadline||"",
+            p.created_at||new Date()]);
+        n++;
+      }
+      report.products = n;
+    }
+
+    // orders
+    if (data.orders) {
+      let n = 0;
+      for (const o of data.orders) {
+        await pool.query(`
+          INSERT INTO orders (id,order_no,client_name,client_phone,delivery,items,total,pay_method,pay_num,sms_results,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          ON CONFLICT (id) DO NOTHING
+        `, [o.id,o.order_no||"",o.client_name||"",o.client_phone||"",o.delivery||"",
+            typeof o.items==="string"?o.items:JSON.stringify(o.items||[]),
+            Number(o.total)||0,o.pay_method||"",o.pay_num||"",
+            o.sms_results||null,o.created_at||new Date()]);
+        n++;
+      }
+      report.orders = n;
+    }
+
+    // rencontres
+    if (data.rencontres) {
+      let n = 0;
+      for (const r of data.rencontres) {
+        await pool.query(`
+          INSERT INTO rencontres (id,nom,prenom,birthdate,profession,ville,quartier,sexe,whatsapp,phone,photo,description,souscat,prix_acces,approved,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          ON CONFLICT (id) DO UPDATE SET
+            approved=EXCLUDED.approved
+        `, [r.id,r.nom||"",r.prenom||"",r.birthdate||null,r.profession||"",r.ville||"",
+            r.quartier||"",r.sexe||"",r.whatsapp||"",r.phone||"",r.photo||"",
+            r.description||"",r.souscat||"amitie",Number(r.prix_acces)||0,
+            r.approved??false,r.created_at||new Date()]);
+        n++;
+      }
+      report.rencontres = n;
+    }
+
+    res.json({ ok: true, imported: report });
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 

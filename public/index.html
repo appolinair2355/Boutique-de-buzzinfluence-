@@ -254,15 +254,15 @@
           </div>
 
           <div class="form-group" style="margin-top:8px">
-            <label>📷 Image de l'article</label>
-            <input name="image" type="file" accept="image/*" class="img-file-input" onchange="previewImg(this)" />
+            <label>📷 Image (JPG, PNG, WebP, HEIC…)</label>
+            <input name="image" type="file" accept="image/*,image/heic,image/heif" class="img-file-input" onchange="previewImg(this)" />
             <div class="img-preview-wrap" style="display:none">
               <img class="img-preview" alt="Aperçu" />
               <button type="button" class="img-preview-remove" onclick="removeImgPreview(this)">✕ Supprimer</button>
             </div>
           </div>
           <div class="form-group"><label>Description / Détails <small style="color:var(--muted)">(confidentiel pour emploi/concours)</small></label><textarea name="description" rows="4" placeholder="Décrivez votre article ou détails de l'offre…"></textarea></div>
-          <button type="submit" class="btn btn-primary btn-lg">
+          <button type="submit" data-label="Publier l'article" class="btn btn-primary btn-lg">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Publier l'article
           </button>

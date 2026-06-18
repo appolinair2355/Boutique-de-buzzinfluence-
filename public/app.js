@@ -167,13 +167,12 @@ function paidListingCard(p) {
     <div class="plisting-body">
       <div class="plisting-cat">${CATEGORIES.find(c=>c[0]===p.category)?.[2]||p.category}</div>
       <div class="plisting-title">${p.title}</div>
-      <div class="plisting-seller">Publié par ${p.ownerName||"Administrateur"}</div>
       <div class="plisting-lock">
         <span class="lock-icon">🔒</span>
         <span>Détails accessibles après paiement</span>
       </div>
       <div class="plisting-price">${fmt(p.price)}</div>
-      <button class="btn-add plisting-btn" onclick='openPaidListing(${JSON.stringify({id:p.id,title:p.title,price:p.price,category:p.category,ownerName:p.ownerName||""}).replace(/'/g,"&#39;")})'>
+      <button class="btn-add plisting-btn" onclick='openPaidListing(${JSON.stringify({id:p.id,title:p.title,price:p.price,category:p.category,ownerName:""}).replace(/'/g,"&#39;")})'>
         🔓 Accéder aux détails
       </button>
     </div>
@@ -184,8 +183,7 @@ function openPaidListing(p) {
   modalHTML(`
     <h2>🔒 Offre protégée <button class="modal-close" onclick="closeModal()">✕</button></h2>
     <div style="background:#F3F4F6;border-radius:var(--radius);padding:14px;margin-bottom:14px">
-      <strong style="font-size:16px">${p.title}</strong><br>
-      <span style="font-size:13px;color:var(--muted)">Publiée par ${p.ownerName||"Administrateur"}</span>
+      <strong style="font-size:16px">${p.title}</strong>
     </div>
     <div style="background:#FFF3E0;border:1.5px solid #FFCC80;border-radius:var(--radius);padding:14px;margin-bottom:16px;font-size:14px;line-height:1.7">
       <strong>📋 Comment ça marche ?</strong><br>
@@ -209,8 +207,8 @@ function productCard(p, isFlash = false) {
   const img = p.image ? `<img src="${p.image}" alt="${p.name||p.title}" loading="lazy" />` : `<span>${p.emoji||"🛍️"}</span>`;
   const wa = (p.whatsapp || "").replace(/\D/g, "");
   const name = p.name || p.title || "";
-  const seller = p.ownerName ? `<div class="pcard-seller">Par ${p.ownerName}</div>` : "";
-  return `<div class="pcard">
+  const pData = JSON.stringify({id:p.id,name,price:p.price,oldPrice:p.oldPrice||null,stock:p.stock||0,image:p.image||null,description:p.description||"",whatsapp:wa,emoji:p.emoji||"🛍️"}).replace(/'/g,"&#39;");
+  return `<div class="pcard" onclick='openProductDetail(${pData})' style="cursor:pointer">
     <div class="pcard-img">
       ${img}
       ${red > 0 ? `<span class="pcard-badge">-${red}%</span>` : ""}
@@ -218,16 +216,35 @@ function productCard(p, isFlash = false) {
     </div>
     <div class="pcard-body">
       <div class="pcard-name">${name}</div>
-      ${seller}
       <div class="pcard-price">${fmt(p.price)}</div>
       ${p.oldPrice ? `<div class="pcard-oldprice">${fmt(p.oldPrice)}</div>` : ""}
-      ${isFlash ? `<div class="stock-bar"><span style="width:${pct}%"></span></div><div class="pcard-stock">${p.stock} restants</div>` : `<div class="pcard-stock">${(p.stock||0)} en stock</div>`}
+      ${isFlash && p.stock > 0 ? `<div class="stock-bar"><span style="width:${pct}%"></span></div><div class="pcard-stock">${p.stock} restants</div>` : (!isFlash && p.stock > 0 ? `<div class="pcard-stock">${p.stock} en stock</div>` : "")}
       <div class="pcard-actions">
-        <button class="btn-add" onclick='addCart(${JSON.stringify({id:p.id,name,price:p.price,emoji:p.emoji||"🛍️"})})'>+ Panier</button>
-        ${wa ? `<button class="btn-wa" onclick="window.open('https://wa.me/${wa}?text='+encodeURIComponent('Bonjour, article: ${name.replace(/'/g,"")}'))">W</button>` : ""}
+        <button class="btn-add" onclick='event.stopPropagation();addCart(${JSON.stringify({id:p.id,name,price:p.price,emoji:p.emoji||"🛍️"})})'>+ Panier</button>
+        ${wa ? `<button class="btn-wa" onclick="event.stopPropagation();window.open('https://wa.me/${wa}?text='+encodeURIComponent('Bonjour, article: ${name.replace(/'/g,"")}'))">W</button>` : ""}
       </div>
     </div>
   </div>`;
+}
+
+function openProductDetail(p) {
+  const wa = (p.whatsapp || "").replace(/\D/g, "");
+  const img = p.image ? `<img src="${p.image}" alt="${p.name}" style="width:100%;max-height:260px;object-fit:cover;border-radius:var(--radius);margin-bottom:14px" />` : "";
+  const desc = (p.description || "").trim();
+  modalHTML(`
+    <h2 style="font-size:17px;margin-bottom:4px">${p.name} <button class="modal-close" onclick="closeModal()">✕</button></h2>
+    ${img}
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <span style="font-size:22px;font-weight:700;color:var(--primary)">${fmt(p.price)}</span>
+      ${p.oldPrice ? `<span style="font-size:14px;color:var(--muted);text-decoration:line-through">${fmt(p.oldPrice)}</span>` : ""}
+      <span style="font-size:13px;color:var(--muted)">${p.stock > 0 ? p.stock+" en stock" : "Rupture de stock"}</span>
+    </div>
+    ${desc ? `<div style="font-size:14px;line-height:1.7;color:var(--text);white-space:pre-line;margin-bottom:14px;background:#f9f9f9;padding:12px;border-radius:var(--radius)">${desc}</div>` : ""}
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Fermer</button>
+      ${wa ? `<button class="btn btn-secondary" onclick="window.open('https://wa.me/${wa}?text='+encodeURIComponent('Bonjour, je suis intéressé par : ${p.name.replace(/'/g,"")}'))">💬 WhatsApp</button>` : ""}
+      <button class="btn btn-primary" onclick='addCart(${JSON.stringify({id:p.id,name:p.name,price:p.price,emoji:p.emoji||"🛍️"})});closeModal()'>+ Panier</button>
+    </div>`);
 }
 
 // ============ RENDER HOME ============
@@ -817,14 +834,37 @@ function switchFormForCat(sel) {
   if (jobSection) jobSection.style.display = isPaid ? "" : "none";
 }
 
+// ============ IMAGE COMPRESSION ============
+async function compressImage(file, maxW = 900, quality = 0.78) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const image = new Image();
+      image.onload = () => {
+        let w = image.width, h = image.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(image, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      image.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // ============ PRODUCT FORM SUBMIT ============
 document.addEventListener("submit", async e => {
   if (e.target.id !== "productForm" && e.target.id !== "adminProductForm") return;
   e.preventDefault();
   const f = e.target;
+  const submitBtn = f.querySelector("button[type=submit]");
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Publication en cours…"; }
+
   const file = f.image && f.image.files[0];
   let img = null;
-  if (file) img = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); });
+  if (file) img = await compressImage(file);
 
   const cat = f.category.value;
   const isPaid = PAID_CATS.has(cat);
@@ -847,31 +887,36 @@ document.addEventListener("submit", async e => {
     desc = (extras ? extras + "\n\n" : "") + desc;
   }
 
-  // Récupérer price/stock/whatsapp selon la section active
-  const priceInputs = f.querySelectorAll("input[name='price']");
-  const price = Number(priceInputs[priceInputs.length-1]?.value || 0);
-  const stock = isPaid ? 9999 : (Number(f.stock?.value) || 0);
-  const whatsappInputs = f.querySelectorAll("input[name='whatsapp']");
-  const whatsapp = whatsappInputs[whatsappInputs.length-1]?.value || "";
+  // Récupérer price/stock/whatsapp selon la section ACTIVE uniquement
+  const activeSection = isPaid ? f.querySelector(".pf-job") : f.querySelector(".pf-article");
+  const price = Number(activeSection?.querySelector("input[name='price']")?.value || 0);
+  const stock = isPaid ? 9999 : (Number(activeSection?.querySelector("input[name='stock']")?.value) || 0);
+  const whatsapp = activeSection?.querySelector("input[name='whatsapp']")?.value || "";
+  const oldPrice = isPaid ? null : (Number(f.querySelector(".pf-article input[name='oldPrice']")?.value) || null);
+  const personalPhone = isPaid ? "" : (f.querySelector(".pf-article input[name='personalPhone']")?.value || "");
 
   const body = {
     ownerId: USER.id, ownerName: USER.name, ownerRole: USER.role,
     title: f.title.value, category: cat,
-    price, oldPrice: isPaid ? null : (Number(f.oldPrice?.value) || null),
-    stock, whatsapp, personalPhone: isPaid ? "" : (f.personalPhone?.value || ""),
+    price, oldPrice, stock, whatsapp, personalPhone,
     image: img, description: desc,
   };
 
-  const r = await fetch("/api/products", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
-  if (r.ok) {
-    f.reset();
-    f.querySelectorAll(".img-preview-wrap").forEach(w => { w.style.display = "none"; });
-    f.querySelectorAll(".img-preview").forEach(i => { i.src = ""; });
-    f.querySelectorAll(".pf-job").forEach(s => { s.style.display = "none"; });
-    f.querySelectorAll(".pf-article").forEach(s => { s.style.display = ""; });
-    if (USER.role === "admin") { toast("✓ Publié immédiatement !", "green"); adminTab("products"); }
-    else { toast("Article envoyé — en attente de validation", "green"); loadMyProducts(); }
-  } else { toast("Erreur lors de la publication", "red"); }
+  try {
+    const r = await fetch("/api/products", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    if (r.ok) {
+      f.reset();
+      f.querySelectorAll(".img-preview-wrap").forEach(w => { w.style.display = "none"; });
+      f.querySelectorAll(".img-preview").forEach(i => { i.src = ""; });
+      f.querySelectorAll(".pf-job").forEach(s => { s.style.display = "none"; });
+      f.querySelectorAll(".pf-article").forEach(s => { s.style.display = ""; });
+      if (USER.role === "admin") { toast("✓ Publié immédiatement !", "green"); adminTab("products"); }
+      else { toast("Article envoyé — en attente de validation", "green"); loadMyProducts(); }
+    } else { toast("Erreur lors de la publication", "red"); }
+  } catch { toast("Erreur réseau", "red"); }
+  finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtn.dataset.label || "Publier l'article"; }
+  }
 });
 
 async function loadMyProducts() {
@@ -951,8 +996,8 @@ function productFormFields() {
     </div>
 
     <div class="form-group" style="margin-top:8px">
-      <label>📷 Image (logo entreprise, affiche…)</label>
-      <input name="image" type="file" accept="image/*" class="img-file-input" onchange="previewImg(this)" />
+      <label>📷 Image (JPG, PNG, WebP, HEIC…)</label>
+      <input name="image" type="file" accept="image/*,image/heic,image/heif" class="img-file-input" onchange="previewImg(this)" />
       <div class="img-preview-wrap" style="display:none">
         <img class="img-preview" alt="Aperçu" />
         <button type="button" class="img-preview-remove" onclick="removeImgPreview(this)">✕ Supprimer</button>
@@ -1044,7 +1089,7 @@ async function adminTab(which) {
       </div>
       <form id="adminProductForm" class="product-form">
         ${productFormFields()}
-        <button type="submit" class="btn btn-primary btn-lg" style="margin-top:4px">
+        <button type="submit" data-label="Publier l'article" class="btn btn-primary btn-lg" style="margin-top:4px">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Publier l'article
         </button>

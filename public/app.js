@@ -38,8 +38,39 @@ const BANNERS = [
 ];
 
 
-const ADMIN_PHONE = "22901679240076";
+const RENCONTRES_WA = "2250767202271"; // WhatsApp fixe pour Rencontres & Amitiés
 const fmt = n => Number(n).toLocaleString("fr-FR") + " FCFA";
+
+// Validation numéro Côte d'Ivoire : +225 suivi de 10 chiffres, ou local 0XXXXXXXXX
+function isValidCIPhone(raw) {
+  const d = (raw || "").replace(/\D/g, "");
+  if (/^225\d{10}$/.test(d)) return true;   // 225XXXXXXXXXX (13 chiffres)
+  if (/^225\d{8}$/.test(d)) return true;    // ancien format 225XXXXXXXX
+  if (/^0\d{9}$/.test(d)) return true;      // 0XXXXXXXXX (10 chiffres local)
+  if (/^\d{8}$/.test(d)) return true;       // 8 chiffres (ancien local)
+  return false;
+}
+
+// Barre de progression simulée (style téléchargement)
+function startProgress(fillId, color = "#F57C00") {
+  const el = document.getElementById(fillId);
+  if (!el) return { done: ()=>{} };
+  el.style.width = "5%";
+  el.style.background = color;
+  let pct = 5;
+  const iv = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 20, 88);
+    const f = document.getElementById(fillId);
+    if (f) f.style.width = pct + "%"; else clearInterval(iv);
+  }, 180);
+  return {
+    done(success = true) {
+      clearInterval(iv);
+      const f = document.getElementById(fillId);
+      if (f) { f.style.width = "100%"; f.style.background = success ? "#43a047" : "#c62828"; f.style.transition = "width .4s"; }
+    }
+  };
+}
 
 // ============ STATE ============
 let CART = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -298,7 +329,7 @@ function openRencontreDetail(p) {
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="closeModal()">Fermer</button>
-      <button class="btn btn-primary" style="background:linear-gradient(135deg,#e91e8c,#c2185b)" onclick='addCart({id:${p.id},name:${JSON.stringify(p.displayName)},price:${p.prixAcces},emoji:"❤️"});closeModal()'>
+      <button class="btn btn-primary" style="background:linear-gradient(135deg,#e91e8c,#c2185b)" onclick='addCart({id:${p.id},name:${JSON.stringify(p.displayName)},price:${p.prixAcces},emoji:"❤️",isRencontre:true});closeModal()'>
         ❤️ Accéder au profil — ${fmt(p.prixAcces)}
       </button>
     </div>`);
@@ -308,7 +339,7 @@ function openRencontreRegister() {
   modalHTML(`
     <h2>❤️ Créer un profil <button class="modal-close" onclick="closeModal()">✕</button></h2>
     <div style="background:#fce4ec;border-left:4px solid #c2185b;border-radius:0 var(--radius) var(--radius) 0;padding:10px 14px;font-size:12px;margin-bottom:14px;line-height:1.6">
-      ✅ Réservé aux <strong>majeurs (18 ans et plus)</strong>. Votre profil sera vérifié par l'administrateur avant publication. Votre identité réelle reste confidentielle.
+      ✅ Réservé aux <strong>majeurs (18 ans et plus)</strong>. Votre profil sera vérifié et publié par l'administrateur. Votre identité réelle reste confidentielle.
     </div>
     <div class="form-row">
       <div class="form-group"><label>Nom *</label><input id="rcNom" placeholder="Votre nom" /></div>
@@ -331,12 +362,11 @@ function openRencontreRegister() {
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>N° WhatsApp</label><input id="rcWa" placeholder="2250700000000" type="tel" /></div>
-      <div class="form-group"><label>N° Téléphone</label><input id="rcPhone" placeholder="2250700000000" type="tel" /></div>
+      <div class="form-group"><label>📞 N° Téléphone (CI uniquement) *</label><input id="rcPhone" placeholder="07 67 20 22 71" type="tel" /></div>
+      <div class="form-group"><label>💬 N° WhatsApp (CI uniquement)</label><input id="rcWa" placeholder="07 67 20 22 71" type="tel" /></div>
     </div>
-    <div class="form-group"><label>Prix d'accès à votre profil (FCFA)</label><input id="rcPrix" type="number" placeholder="500" value="500" /></div>
     <div class="form-group">
-      <label>📷 Votre photo <small style="color:var(--muted)">(jamais visible publiquement — uniquement après accès accordé)</small></label>
+      <label>📷 Votre photo <small style="color:var(--muted)">(jamais visible publiquement — uniquement après paiement d'accès)</small></label>
       <input id="rcPhoto" type="file" accept="image/*,image/heic,image/heif" class="img-file-input" onchange="previewRcImg(this)" />
       <div id="rcPhotoPreview" style="display:none;margin-top:8px;display:flex;align-items:center;gap:10px">
         <img id="rcPhotoImg" style="width:72px;height:72px;object-fit:cover;border-radius:50%;border:3px solid #c2185b" />
@@ -345,7 +375,7 @@ function openRencontreRegister() {
     </div>
     <div class="form-group">
       <label>Description <small style="color:var(--muted)">(décrivez-vous et le type de personne que vous recherchez)</small></label>
-      <textarea id="rcDesc" rows="5" placeholder="Je suis une personne sérieuse…&#10;Je recherche quelqu'un qui…&#10;Mes coordonnées : WhatsApp +225… / Tél +225…" style="width:100%;border:1px solid #ddd;border-radius:var(--radius);padding:10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+      <textarea id="rcDesc" rows="4" placeholder="Je suis une personne sérieuse…&#10;Je recherche quelqu'un qui…" style="width:100%;border:1px solid #ddd;border-radius:var(--radius);padding:10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
     </div>
     <div style="background:#fce4ec;border-radius:var(--radius);padding:12px;font-size:12px;margin-bottom:16px;line-height:1.8">
       <strong>📋 Règles à respecter :</strong><br>
@@ -355,6 +385,10 @@ function openRencontreRegister() {
       ✅ Interdiction des arnaques et demandes d'argent<br>
       ✅ Réservé aux personnes majeures (18 ans et plus)<br>
       ✅ Vos infos personnelles restent protégées
+    </div>
+    <div id="rcProgressWrap" style="display:none" class="progress-wrap">
+      <p>⏳ Envoi en cours…</p>
+      <div class="progress-track"><div class="progress-fill" id="rcProgressFill"></div></div>
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
@@ -379,22 +413,33 @@ async function submitRencontreProfile() {
   const prenom = document.getElementById("rcPrenom").value.trim();
   const birthdate = document.getElementById("rcBirth").value;
   const sexe = document.getElementById("rcSexe").value;
+  const phoneVal = document.getElementById("rcPhone").value.trim();
+  const waVal = document.getElementById("rcWa").value.trim();
   if (!nom || !prenom || !birthdate || !sexe) return toast("Remplissez les champs obligatoires (nom, prénom, date, sexe)", "red");
   const age = new Date().getFullYear() - new Date(birthdate).getFullYear();
   if (age < 18) return toast("Vous devez avoir au moins 18 ans", "red");
+  if (!phoneVal) return toast("Le numéro de téléphone est obligatoire", "red");
+  if (!isValidCIPhone(phoneVal)) return toast("Le téléphone doit être un numéro ivoirien (+225 XXXXXXXXXX)", "red");
+  if (waVal && !isValidCIPhone(waVal)) return toast("Le numéro WhatsApp doit être un numéro ivoirien (+225 XXXXXXXXXX)", "red");
+
   const btn = document.getElementById("rcSubmitBtn");
-  if (btn) { btn.disabled = true; btn.textContent = "Envoi en cours…"; }
+  const pw = document.getElementById("rcProgressWrap");
+  if (btn) { btn.disabled = true; btn.textContent = "Envoi…"; }
+  if (pw) pw.style.display = "block";
+  const bar = startProgress("rcProgressFill", "#c2185b");
+
   const photoFile = document.getElementById("rcPhoto").files[0];
   let photo = null;
   if (photoFile) photo = await compressImage(photoFile);
+
   const body = {
     nom, prenom, birthdate, sexe,
     profession: document.getElementById("rcProf").value.trim(),
     ville: document.getElementById("rcVille").value.trim(),
     quartier: document.getElementById("rcQuartier").value.trim(),
-    whatsapp: document.getElementById("rcWa").value.trim(),
-    phone: document.getElementById("rcPhone").value.trim(),
-    prixAcces: Number(document.getElementById("rcPrix").value) || 500,
+    whatsapp: waVal,
+    phone: phoneVal,
+    prixAcces: 500, // défini par l'administrateur lors de l'approbation
     description: document.getElementById("rcDesc").value.trim(),
     souscat: document.getElementById("rcSouscat").value,
     photo,
@@ -402,11 +447,13 @@ async function submitRencontreProfile() {
   try {
     const r = await fetch("/api/rencontres", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
     const j = await r.json();
+    bar.done(r.ok);
+    await new Promise(res => setTimeout(res, 400));
     if (r.ok) {
       closeModal();
       toast("✓ Profil envoyé — en attente de validation par l'administrateur", "green");
     } else { toast(j.error || "Erreur lors de l'envoi", "red"); }
-  } catch { toast("Erreur réseau", "red"); }
+  } catch { bar.done(false); toast("Erreur réseau", "red"); }
   finally { if (btn) { btn.disabled = false; btn.textContent = "❤️ Envoyer mon profil"; } }
 }
 
@@ -688,9 +735,9 @@ Partage : Nous ne vendons ni ne louons les données personnelles à des tiers.
 
 Vos droits : Vous pouvez demander la modification ou suppression de vos données à tout moment.` },
     contact: { t:"Nous contacter", ico:"📞", b:`📍 Abengourou, Côte d'Ivoire
-📞 Téléphone : +225 XX XX XX XX XX
+📞 Téléphone : +225 0767202271
 📧 E-mail : contact@abengourou-market.com
-🌐 Site web : www.abengourou-market.com
+🌐 Site web : ${window.location.origin}
 
 Service client
 Du lundi au samedi · 08h00 à 18h00
@@ -705,7 +752,7 @@ Nos offres publicitaires :
 
 Contactez-nous pour les tarifs :
 📧 contact@abengourou-market.com
-📞 +225 XX XX XX XX XX` },
+📞 +225 0767202271` },
   };
   const T = TEXTS[key];
   document.getElementById("textBody").innerHTML = `
@@ -718,7 +765,11 @@ Contactez-nous pour les tarifs :
 function addCart(p) {
   const ex = CART.find(i => String(i.id) === String(p.id));
   if (ex) ex.qty++;
-  else CART.push({ id: p.id, name: p.name, price: p.price, emoji: p.emoji || "📦", qty: 1 });
+  else CART.push({
+    id: p.id, name: p.name, price: p.price, emoji: p.emoji || "📦", qty: 1,
+    whatsapp: (p.whatsapp || "").replace(/\D/g, ""),
+    isRencontre: p.isRencontre || false,
+  });
   saveCart();
   toast("✓ Ajouté au panier", "green");
 }
@@ -857,10 +908,11 @@ function askContact() {
     </div>`);
 }
 function showPayment() {
-  CHECKOUT.name = document.getElementById("coName").value;
-  CHECKOUT.phone = document.getElementById("coPhone").value;
-  CHECKOUT.address = document.getElementById("coAddr").value;
+  CHECKOUT.name = document.getElementById("coName").value.trim();
+  CHECKOUT.phone = document.getElementById("coPhone").value.trim();
+  CHECKOUT.address = document.getElementById("coAddr").value.trim();
   if (!CHECKOUT.name || !CHECKOUT.phone) return toast("Veuillez remplir nom et téléphone", "red");
+  if (!isValidCIPhone(CHECKOUT.phone)) return toast("Le téléphone doit être un numéro ivoirien (+225 XXXXXXXXXX)", "red");
   modalHTML(`
     <h2>💳 Paiement <button class="modal-close" onclick="closeModal()">✕</button></h2>
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Choisissez votre mode de paiement :</p>
@@ -884,21 +936,62 @@ function selectPay(el, name) {
   el.classList.add("sel");
   CHECKOUT.payMethod = name;
 }
+function showPaymentProgress() {
+  // Remplace le bouton Confirmer par une barre de progression
+  const btn = document.querySelector("#modalBody .btn-primary[onclick='finalizeOrder()']");
+  if (btn) {
+    const wrap = document.createElement("div");
+    wrap.id = "orderProgressWrap";
+    wrap.className = "progress-wrap";
+    wrap.innerHTML = `<p>⏳ Enregistrement de la commande…</p><div class="progress-track"><div class="progress-fill" id="orderProgressFill"></div></div>`;
+    btn.parentNode.replaceChild(wrap, btn);
+  }
+  return startProgress("orderProgressFill");
+}
+
 async function finalizeOrder() {
   if (!CHECKOUT.payMethod) return toast("Choisissez un mode de paiement", "red");
-  CHECKOUT.payNum = document.getElementById("payNum").value;
-  if (!CHECKOUT.payNum) return toast("Entrez votre numéro", "red");
+  CHECKOUT.payNum = document.getElementById("payNum").value.trim();
+  if (!CHECKOUT.payNum) return toast("Entrez votre numéro mobile money", "red");
+  if (!isValidCIPhone(CHECKOUT.payNum)) return toast("Le numéro mobile money doit être un numéro ivoirien (+225)", "red");
+
+  const bar = showPaymentProgress();
   const total = CART.reduce((s, i) => s + i.price * i.qty, 0);
   const order = { ...CHECKOUT, items: CART, total };
+
+  // Sauvegarder en base de données
   try { await fetch("/api/orders", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(order) }); } catch {}
-  const msg = `🛒 *Nouvelle commande ABENGOUROU-MARKET*%0A👤 ${order.name} (${order.phone})%0A📍 ${order.delivery==="domicile"?"Livraison : "+order.address+(order.mapsUrl?" "+order.mapsUrl:""):"Retrait à l'agence"}%0A📦 Articles :%0A${order.items.map(i=>`• ${i.qty}× ${i.name} = ${fmt(i.price*i.qty)}`).join("%0A")}%0A💰 Total : ${fmt(total)}%0A💳 Paiement : ${order.payMethod} (${order.payNum})`;
-  window.open(`https://wa.me/${ADMIN_PHONE}?text=${msg}`, "_blank");
+
+  // Construire le message WhatsApp
+  const buildMsg = (items) => {
+    const t = items.reduce((s,i)=>s+i.price*i.qty,0);
+    return `🛒 *Nouvelle commande ABENGOUROU-MARKET.CI*%0A👤 ${order.name} (${order.phone})%0A📍 ${order.delivery==="domicile"?"Livraison : "+(order.address||"")+(order.mapsUrl?" "+order.mapsUrl:""):"Retrait à l'agence"}%0A%0A📦 Articles :%0A${items.map(i=>`• ${i.qty}× ${i.name} — ${fmt(i.price*i.qty)}`).join("%0A")}%0A%0A💰 Total : ${fmt(t)}%0A💳 Paiement : ${order.payMethod} (${order.payNum})`;
+  };
+
+  // Grouper par WhatsApp vendeur : Rencontres → numéro fixe, autres → WA du produit
+  const waGroups = {};
+  for (const item of CART) {
+    const wa = item.isRencontre ? RENCONTRES_WA : (item.whatsapp || "");
+    if (wa) {
+      waGroups[wa] = waGroups[wa] || [];
+      waGroups[wa].push(item);
+    }
+  }
+
+  bar.done(true);
+  await new Promise(r => setTimeout(r, 350));
+
+  // Ouvrir WhatsApp pour chaque vendeur
+  for (const [wa, items] of Object.entries(waGroups)) {
+    window.open(`https://wa.me/${wa}?text=${buildMsg(items)}`, "_blank");
+  }
+
   CART = []; saveCart(); CHECKOUT = {};
   modalHTML(`
     <div style="text-align:center;padding:20px">
       <div style="font-size:64px">✅</div>
       <h2 style="color:var(--secondary);margin-top:12px">Commande confirmée !</h2>
-      <p style="margin:12px 0;color:var(--muted);font-size:14px">Votre commande a été envoyée. Vous recevrez un appel pour confirmation dans quelques minutes.</p>
+      <p style="margin:12px 0;color:var(--muted);font-size:14px">Votre commande a été enregistrée. Le vendeur va vous contacter sous peu.</p>
       <button class="btn btn-primary btn-lg" onclick="closeModal();showHome()">Retour à l'accueil</button>
     </div>`);
 }
@@ -977,10 +1070,25 @@ async function doRegister() {
     role: "vendeur",
   };
   if (!data.id || !data.pwd || !data.name) return toast("Remplissez tous les champs", "red");
+  if (data.phone && !isValidCIPhone(data.phone)) return toast("Le numéro de téléphone doit être un numéro ivoirien (+225)", "red");
+
+  // Barre de progression sur le bouton
+  const btn = event.target;
+  const origText = btn.textContent;
+  btn.disabled = true;
+  const pgWrap = document.createElement("div");
+  pgWrap.className = "progress-wrap";
+  pgWrap.innerHTML = `<p>⏳ Création du compte…</p><div class="progress-track"><div class="progress-fill" id="regProgressFill"></div></div>`;
+  btn.parentNode.insertBefore(pgWrap, btn.nextSibling);
+  const bar = startProgress("regProgressFill");
+
   const r = await fetch("/api/register", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(data) });
   const j = await r.json();
+  bar.done(r.ok);
+  await new Promise(res => setTimeout(res, 400));
+  btn.disabled = false; btn.textContent = origText;
   if (!r.ok) return toast(j.error || "Erreur", "red");
-  toast(data.role === "vendeur" ? "Inscription envoyée — en attente de validation" : "Compte créé ! Connectez-vous.", "green");
+  toast("Inscription envoyée — en attente de validation", "green");
   accTab(document.querySelectorAll(".tabs button")[0], "login");
 }
 function logout() { USER = null; localStorage.removeItem("user"); closeModal(); toast("Déconnecté"); showHome(); }
@@ -1362,7 +1470,7 @@ async function adminTab(which) {
               ${st}
             </div>
             <div class="admin-row-actions">
-              ${!p.approved ? `<button class="btn btn-secondary btn-sm" onclick="approveRencontre(${p.id})">✓ Approuver</button>` : ""}
+              ${!p.approved ? `<button class="btn btn-secondary btn-sm" onclick="askApproveRencontre(${p.id},${p.prixAcces||500},'${p.souscat||"amitie"}')">✓ Approuver &amp; définir le prix</button>` : ""}
               <button class="btn btn-danger btn-sm" onclick="deleteRencontre(${p.id})">Supprimer</button>
             </div>
           </div>`;
@@ -1443,8 +1551,22 @@ async function adminTab(which) {
           <div class="form-row">
             <div class="form-group">
               <label>Nom de l'entreprise</label>
-              <input id="setCompany" value="${s.companyName || ""}" placeholder="ABENGOUROU-MARKET" />
+              <input id="setCompany" value="${s.companyName || ""}" placeholder="ABENGOUROU-MARKET.CI" />
               <div class="form-hint">Apparaît dans l'en-tête des SMS envoyés aux vendeurs.</div>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label>📞 Téléphone de contact</label>
+              <input id="setPhone" value="${s.companyPhone || "+225 0767202271"}" placeholder="+225 0767202271" />
+              <div class="form-hint">Affiché dans le footer et la page Contact.</div>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label>📧 E-mail de contact</label>
+              <input id="setEmail" value="${s.companyEmail || "contact@abengourou-market.com"}" placeholder="contact@abengourou-market.com" type="email" />
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label>🌐 Site web (URL)</label>
+              <input id="setWebsite" value="${s.companyWebsite || window.location.origin}" placeholder="${window.location.origin}" />
+              <div class="form-hint">Lien affiché automatiquement depuis l'URL du serveur.</div>
             </div>
           </div>
         </div>
@@ -1550,7 +1672,46 @@ async function importDbFileObj(file) {
 }
 function importDbFile(input) { if (input.files[0]) importDbFileObj(input.files[0]); }
 
-async function approveRencontre(id) { await fetch("/api/rencontres/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Profil approuvé ✓","green"); adminTab("rencontres"); }
+function askApproveRencontre(id, prixCurrent, souscat) {
+  modalHTML(`
+    <h2>✓ Approuver le profil <button class="modal-close" onclick="closeModal()">✕</button></h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Définissez le prix d'accès et le type de rencontre avant de publier ce profil.</p>
+    <div class="form-group">
+      <label>💰 Prix d'accès au profil (FCFA)</label>
+      <input id="apPrix" type="number" min="0" step="100" value="${prixCurrent||500}" placeholder="500" />
+    </div>
+    <div class="form-group">
+      <label>Type de rencontre</label>
+      <select id="apSouscat">
+        <option value="amitie" ${souscat==="amitie"?"selected":""}>💙 Amitié</option>
+        <option value="serieux" ${souscat==="serieux"?"selected":""}>❤️ Relation sérieuse</option>
+      </select>
+    </div>
+    <div id="apProgressWrap" style="display:none" class="progress-wrap">
+      <p>⏳ Approbation en cours…</p>
+      <div class="progress-track"><div class="progress-fill" id="apProgressFill" style="background:#c2185b"></div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+      <button id="apBtn" class="btn btn-secondary" onclick="approveRencontre(${id})">✓ Confirmer &amp; publier</button>
+    </div>`);
+}
+async function approveRencontre(id) {
+  const prixAcces = Number(document.getElementById("apPrix")?.value) || 500;
+  const souscat = document.getElementById("apSouscat")?.value || "amitie";
+  const btn = document.getElementById("apBtn");
+  const pw = document.getElementById("apProgressWrap");
+  if (btn) btn.disabled = true;
+  if (pw) pw.style.display = "block";
+  const bar = startProgress("apProgressFill", "#c2185b");
+  try {
+    const r = await fetch("/api/rencontres/approve", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id, prixAcces, souscat})});
+    bar.done(r.ok);
+    await new Promise(res => setTimeout(res, 400));
+    if (r.ok) { closeModal(); toast("Profil approuvé et publié ✓","green"); adminTab("rencontres"); }
+    else { toast("Erreur lors de l'approbation","red"); if (btn) btn.disabled = false; }
+  } catch { bar.done(false); toast("Erreur réseau","red"); if (btn) btn.disabled = false; }
+}
 async function deleteRencontre(id) { if(!confirm("Supprimer ce profil ?"))return; await fetch("/api/rencontres/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Profil supprimé"); adminTab("rencontres"); }
 async function approveVendor(id) { await fetch("/api/vendors/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Compte vendeur approuvé ✓","green"); adminTab("vendors"); }
 async function deleteVendor(id) { if(!confirm("Supprimer ce compte vendeur ?"))return; await fetch("/api/vendors/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Vendeur supprimé",""); adminTab("vendors"); }
@@ -1560,7 +1721,10 @@ async function deleteProduct(id) { if(!confirm("Supprimer définitivement cet ar
 
 async function saveSettings() {
   const body = {
-    companyName: document.getElementById("setCompany").value,
+    companyName:    document.getElementById("setCompany")?.value,
+    companyPhone:   document.getElementById("setPhone")?.value,
+    companyEmail:   document.getElementById("setEmail")?.value,
+    companyWebsite: document.getElementById("setWebsite")?.value,
     sms: {
       enabled: document.getElementById("smsEnabled").checked,
       url: document.getElementById("smsUrl").value,
@@ -1569,6 +1733,9 @@ async function saveSettings() {
     },
   };
   await fetch("/api/settings", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  // Mettre à jour le footer dynamiquement
+  if (body.companyPhone) { const el = document.getElementById("footerPhone"); if(el) el.textContent = body.companyPhone; const eh = document.getElementById("headerPhone"); if(eh) eh.textContent = body.companyPhone; }
+  if (body.companyEmail) { const el = document.getElementById("footerEmail"); if(el) el.textContent = body.companyEmail; }
   const msg = document.getElementById("settingsMsg");
   if (msg) { msg.className = "sms-result ok"; msg.textContent = "✓ Paramètres enregistrés avec succès."; }
   toast("Paramètres enregistrés ✓","green");

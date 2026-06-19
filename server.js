@@ -78,6 +78,9 @@ async function initDB() {
       subscription_price  NUMERIC DEFAULT 5000,
       sms_config          JSONB DEFAULT '{}'
     );
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_phone TEXT DEFAULT '+225 0767202271';
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_email TEXT DEFAULT 'contact@abengourou-market.com';
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_website TEXT DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS rencontres (
       id               BIGINT PRIMARY KEY,
@@ -175,7 +178,10 @@ async function getSettings() {
   const s = rows[0] || {};
   const defaultSms = { enabled: false, method: "POST", url: "", contentType: "application/json", headers: "", bodyTemplate: "", sender: "ABGMARKET", apiKey: "" };
   return {
-    companyName: s.company_name || "ABENGOUROU-MARKET",
+    companyName: s.company_name || "ABENGOUROU-MARKET.CI",
+    companyPhone: s.company_phone || "+225 0767202271",
+    companyEmail: s.company_email || "contact@abengourou-market.com",
+    companyWebsite: s.company_website || "",
     subscriptionPrice: Number(s.subscription_price) || 5000,
     sms: { ...defaultSms, ...(s.sms_config || {}) },
   };
@@ -206,7 +212,8 @@ async function sendSMS(settings, to, message) {
   }
 }
 
-app.use(express.json({ limit: "12mb" }));
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -249,13 +256,17 @@ app.get("/api/settings", async (_req, res) => {
 app.post("/api/settings", async (req, res) => {
   try {
     const cur = await getSettings();
-    const { companyName, subscriptionPrice, sms } = req.body || {};
-    const newName  = companyName !== undefined ? companyName : cur.companyName;
-    const newPrice = subscriptionPrice !== undefined ? Number(subscriptionPrice) : cur.subscriptionPrice;
-    const newSms   = sms ? { ...cur.sms, ...sms } : cur.sms;
+    const { companyName, companyPhone, companyEmail, companyWebsite, subscriptionPrice, sms } = req.body || {};
+    const newName    = companyName    !== undefined ? companyName    : cur.companyName;
+    const newPhone   = companyPhone   !== undefined ? companyPhone   : cur.companyPhone;
+    const newEmail   = companyEmail   !== undefined ? companyEmail   : cur.companyEmail;
+    const newWebsite = companyWebsite !== undefined ? companyWebsite : cur.companyWebsite;
+    const newPrice   = subscriptionPrice !== undefined ? Number(subscriptionPrice) : cur.subscriptionPrice;
+    const newSms     = sms ? { ...cur.sms, ...sms } : cur.sms;
     await pool.query(
-      "UPDATE settings SET company_name=$1, subscription_price=$2, sms_config=$3 WHERE id=1",
-      [newName, newPrice, JSON.stringify(newSms)]
+      `UPDATE settings SET company_name=$1, subscription_price=$2, sms_config=$3,
+       company_phone=$4, company_email=$5, company_website=$6 WHERE id=1`,
+      [newName, newPrice, JSON.stringify(newSms), newPhone, newEmail, newWebsite]
     );
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: String(e) }); }
@@ -515,7 +526,19 @@ app.post("/api/rencontres", async (req, res) => {
 
 app.post("/api/rencontres/approve", async (req, res) => {
   try {
-    await pool.query("UPDATE rencontres SET approved=true WHERE id=$1", [Number(req.body.id)]);
+    const id = Number(req.body.id);
+    const prix = req.body.prixAcces != null ? Number(req.body.prixAcces) : null;
+    const souscat = req.body.souscat || null;
+    if (prix !== null && souscat) {
+      await pool.query(
+        "UPDATE rencontres SET approved=true, prix_acces=$2, sous_cat=$3 WHERE id=$1",
+        [id, prix, souscat]
+      );
+    } else if (prix !== null) {
+      await pool.query("UPDATE rencontres SET approved=true, prix_acces=$2 WHERE id=$1", [id, prix]);
+    } else {
+      await pool.query("UPDATE rencontres SET approved=true WHERE id=$1", [id]);
+    }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
@@ -549,25 +572,46 @@ app.get("/api/admin/export/json", async (req, res) => {
 });
 
 // Export Excel multi-feuilles (une feuille par table)
+// Note: les images base64 sont trop longues pour Excel (limite 32767 chars/cellule).
+// Elles sont remplacées par "[IMAGE: voir export JSON pour données complètes]".
+// Utilisez l'export JSON pour un backup complet avec images.
 app.get("/api/admin/export/excel", async (req, res) => {
   try {
     const wb = XLSX.utils.book_new();
+    const IMG_COLS = new Set(["image", "photo"]); // colonnes contenant des base64
     for (const t of EXPORT_TABLES) {
       const { rows } = await pool.query(`SELECT * FROM ${t} ORDER BY id`);
       if (!rows.length) {
-        // Feuille vide avec juste un header
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[`Aucune donnée dans ${t}`]]), t);
         continue;
       }
       const ws = XLSX.utils.json_to_sheet(rows.map(r => {
         const o = {};
         for (const [k, v] of Object.entries(r)) {
-          o[k] = typeof v === "object" && v !== null ? JSON.stringify(v) : v;
+          if (IMG_COLS.has(k) && typeof v === "string" && v.length > 100) {
+            // Indiquer qu'une image existe sans la copier dans la cellule
+            o[k] = v.startsWith("data:") ? `[IMAGE ${Math.round(v.length/1024)}KB — voir JSON export]` : v.slice(0, 200);
+          } else if (typeof v === "object" && v !== null) {
+            o[k] = JSON.stringify(v);
+          } else {
+            o[k] = v;
+          }
         }
         return o;
       }));
       XLSX.utils.book_append_sheet(wb, ws, t);
     }
+    // Feuille de légende
+    const legend = XLSX.utils.aoa_to_sheet([
+      ["ABENGOUROU-MARKET.CI — Export base de données", new Date().toLocaleString("fr-FR")],
+      [""],
+      ["⚠️ Note importante sur les images"],
+      ["Les colonnes 'image' et 'photo' affichent [IMAGE xxKB] car Excel ne peut pas stocker les images base64."],
+      ["Utilisez l'export JSON (/api/admin/export/json) pour un backup complet incluant toutes les images."],
+      [""],
+      ["Tables exportées:", EXPORT_TABLES.join(", ")],
+    ]);
+    XLSX.utils.book_append_sheet(wb, legend, "README");
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="abengourou-market-${new Date().toISOString().slice(0,10)}.xlsx"`);
@@ -611,23 +655,34 @@ app.post("/api/admin/import/json", upload.single("file"), async (req, res) => {
       report.users = n;
     }
 
-    // products
+    // products — colonne "image" TEXT (base64 ou null)
     if (data.products) {
       let n = 0;
       for (const p of data.products) {
+        // Support both snake_case (raw DB export) and camelCase (API export)
+        const imgVal = p.image || null; // colonne réelle = image TEXT
         await pool.query(`
-          INSERT INTO products (id,name,description,price,old_price,category,sub_cat,images,stock,owner_id,owner_name,owner_phone,owner_role,approved,blocked,employer,job_location,contract_type,salary,deadline,created_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          INSERT INTO products
+            (id,title,description,price,old_price,category,image,stock,stock_init,
+             owner_id,owner_name,owner_role,whatsapp,personal_phone,approved,blocked,
+             employer,job_location,contract_type,salary,deadline,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
           ON CONFLICT (id) DO UPDATE SET
-            name=EXCLUDED.name, description=EXCLUDED.description, price=EXCLUDED.price,
-            old_price=EXCLUDED.old_price, category=EXCLUDED.category, images=EXCLUDED.images,
+            title=EXCLUDED.title, description=EXCLUDED.description, price=EXCLUDED.price,
+            old_price=EXCLUDED.old_price, category=EXCLUDED.category, image=EXCLUDED.image,
             stock=EXCLUDED.stock, approved=EXCLUDED.approved, blocked=EXCLUDED.blocked
-        `, [p.id,p.name,p.description||"",Number(p.price)||0,Number(p.old_price)||0,
-            p.category||"",p.sub_cat||"",JSON.stringify(p.images||[]),Number(p.stock)||0,
-            p.owner_id||"",p.owner_name||"",p.owner_phone||"",p.owner_role||"client",
-            p.approved??false,p.blocked??false,
-            p.employer||"",p.job_location||"",p.contract_type||"",p.salary||"",p.deadline||"",
-            p.created_at||new Date()]);
+        `, [
+          p.id, p.title||p.name||"", p.description||"",
+          Number(p.price)||0, p.old_price!=null?Number(p.old_price):null,
+          p.category||"", imgVal,
+          Number(p.stock)||0, Number(p.stock_init||p.stock)||0,
+          p.owner_id||p.ownerId||"", p.owner_name||p.ownerName||"", p.owner_role||p.ownerRole||"vendeur",
+          p.whatsapp||"", p.personal_phone||p.personalPhone||"",
+          p.approved??false, p.blocked??false,
+          p.employer||"", p.job_location||p.jobLocation||"",
+          p.contract_type||p.contractType||"", p.salary||"", p.deadline||"",
+          p.created_at||p.createdAt||new Date()
+        ]);
         n++;
       }
       report.products = n;
@@ -650,22 +705,45 @@ app.post("/api/admin/import/json", upload.single("file"), async (req, res) => {
       report.orders = n;
     }
 
-    // rencontres
+    // rencontres — colonne DB = sous_cat (pas souscat)
     if (data.rencontres) {
       let n = 0;
       for (const r of data.rencontres) {
+        const souscat = r.sous_cat || r.souscat || "amitie"; // support both DB and API export formats
         await pool.query(`
-          INSERT INTO rencontres (id,nom,prenom,birthdate,profession,ville,quartier,sexe,whatsapp,phone,photo,description,souscat,prix_acces,approved,created_at)
+          INSERT INTO rencontres (id,nom,prenom,birthdate,profession,ville,quartier,sexe,whatsapp,phone,photo,description,sous_cat,prix_acces,approved,created_at)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
           ON CONFLICT (id) DO UPDATE SET
-            approved=EXCLUDED.approved
+            approved=EXCLUDED.approved, photo=EXCLUDED.photo,
+            description=EXCLUDED.description, profession=EXCLUDED.profession
         `, [r.id,r.nom||"",r.prenom||"",r.birthdate||null,r.profession||"",r.ville||"",
-            r.quartier||"",r.sexe||"",r.whatsapp||"",r.phone||"",r.photo||"",
-            r.description||"",r.souscat||"amitie",Number(r.prix_acces)||0,
+            r.quartier||"",r.sexe||"",r.whatsapp||"",r.phone||"",r.photo||null,
+            r.description||"",souscat,Number(r.prix_acces||r.prixAcces)||500,
             r.approved??false,r.created_at||new Date()]);
         n++;
       }
       report.rencontres = n;
+    }
+
+    // settings (optionnel — restaurer les paramètres)
+    if (data.settings && Array.isArray(data.settings)) {
+      for (const s of data.settings) {
+        await pool.query(`
+          UPDATE settings SET
+            company_name=COALESCE($1, company_name),
+            subscription_price=COALESCE($2, subscription_price),
+            sms_config=COALESCE($3, sms_config),
+            company_phone=COALESCE($4, company_phone),
+            company_email=COALESCE($5, company_email),
+            company_website=COALESCE($6, company_website)
+          WHERE id=1
+        `, [
+          s.company_name||null, s.subscription_price||null,
+          s.sms_config ? JSON.stringify(s.sms_config) : null,
+          s.company_phone||null, s.company_email||null, s.company_website||null
+        ]);
+      }
+      report.settings = data.settings.length;
     }
 
     res.json({ ok: true, imported: report });

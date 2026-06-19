@@ -15,8 +15,10 @@ const ADMIN_PWD = process.env.ADMIN_PWD || "arrow";
 
 // ─── Connexion PostgreSQL ────────────────────────────────────────────────────
 const pool = new Pool({
-  connectionString: "postgresql://boutique_en_ligne_user:28HKostTV7XpwU2nVso0cKbQwd1avOBn@dpg-d8pq2337uimc73aedqog-a.oregon-postgres.render.com/boutique_en_ligne",
-  ssl: { rejectUnauthorized: false },
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes("render.com")
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
 // ─── Création des tables au démarrage ───────────────────────────────────────
@@ -81,6 +83,7 @@ async function initDB() {
     ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_phone TEXT DEFAULT '+225 0767202271';
     ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_email TEXT DEFAULT 'contact@abengourou-market.com';
     ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_website TEXT DEFAULT '';
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS company_whatsapp TEXT DEFAULT '2250767202271';
 
     CREATE TABLE IF NOT EXISTS rencontres (
       id               BIGINT PRIMARY KEY,
@@ -182,6 +185,7 @@ async function getSettings() {
     companyPhone: s.company_phone || "+225 0767202271",
     companyEmail: s.company_email || "contact@abengourou-market.com",
     companyWebsite: s.company_website || "",
+    companyWhatsapp: s.company_whatsapp || "2250767202271",
     subscriptionPrice: Number(s.subscription_price) || 5000,
     sms: { ...defaultSms, ...(s.sms_config || {}) },
   };
@@ -256,17 +260,18 @@ app.get("/api/settings", async (_req, res) => {
 app.post("/api/settings", async (req, res) => {
   try {
     const cur = await getSettings();
-    const { companyName, companyPhone, companyEmail, companyWebsite, subscriptionPrice, sms } = req.body || {};
-    const newName    = companyName    !== undefined ? companyName    : cur.companyName;
-    const newPhone   = companyPhone   !== undefined ? companyPhone   : cur.companyPhone;
-    const newEmail   = companyEmail   !== undefined ? companyEmail   : cur.companyEmail;
-    const newWebsite = companyWebsite !== undefined ? companyWebsite : cur.companyWebsite;
-    const newPrice   = subscriptionPrice !== undefined ? Number(subscriptionPrice) : cur.subscriptionPrice;
-    const newSms     = sms ? { ...cur.sms, ...sms } : cur.sms;
+    const { companyName, companyPhone, companyEmail, companyWebsite, companyWhatsapp, subscriptionPrice, sms } = req.body || {};
+    const newName      = companyName      !== undefined ? companyName      : cur.companyName;
+    const newPhone     = companyPhone     !== undefined ? companyPhone     : cur.companyPhone;
+    const newEmail     = companyEmail     !== undefined ? companyEmail     : cur.companyEmail;
+    const newWebsite   = companyWebsite   !== undefined ? companyWebsite   : cur.companyWebsite;
+    const newWhatsapp  = companyWhatsapp  !== undefined ? String(companyWhatsapp).replace(/\D/g,"") : cur.companyWhatsapp;
+    const newPrice     = subscriptionPrice !== undefined ? Number(subscriptionPrice) : cur.subscriptionPrice;
+    const newSms       = sms ? { ...cur.sms, ...sms } : cur.sms;
     await pool.query(
       `UPDATE settings SET company_name=$1, subscription_price=$2, sms_config=$3,
-       company_phone=$4, company_email=$5, company_website=$6 WHERE id=1`,
-      [newName, newPrice, JSON.stringify(newSms), newPhone, newEmail, newWebsite]
+       company_phone=$4, company_email=$5, company_website=$6, company_whatsapp=$7 WHERE id=1`,
+      [newName, newPrice, JSON.stringify(newSms), newPhone, newEmail, newWebsite, newWhatsapp]
     );
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: String(e) }); }
@@ -405,6 +410,32 @@ app.post("/api/products/delete", async (req, res) => {
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
+// Modifier un article (admin)
+app.post("/api/products/update", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const id = Number(b.id);
+    if (!id) return res.status(400).json({ error: "id manquant" });
+    await pool.query(
+      `UPDATE products SET
+        title=$1, category=$2, price=$3, old_price=$4, stock=$5,
+        description=$6, whatsapp=$7, personal_phone=$8,
+        employer=$9, job_location=$10, contract_type=$11, salary=$12, deadline=$13
+       WHERE id=$14`,
+      [
+        b.title||"", b.category||"", Number(b.price)||0,
+        b.oldPrice ? Number(b.oldPrice) : null,
+        Number(b.stock)||0,
+        b.description||"", b.whatsapp||"", b.personalPhone||"",
+        b.employer||"", b.jobLocation||"", b.contractType||"",
+        b.salary||"", b.deadline||"", id,
+      ]
+    );
+    const { rows } = await pool.query("SELECT * FROM products WHERE id=$1", [id]);
+    res.json(rows[0] ? rowToProduct(rows[0]) : { ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
 // ─── Orders ───────────────────────────────────────────────────────────────────
 app.get("/api/orders", async (_req, res) => {
   try {
@@ -454,6 +485,36 @@ app.post("/api/orders", async (req, res) => {
     await pool.query("UPDATE orders SET sms_results=$1 WHERE id=$2", [JSON.stringify(smsResults), id]);
 
     res.json({ id, orderNo, ...b, smsResults, createdAt: new Date().toISOString() });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Supprimer une commande (admin)
+app.post("/api/orders/delete", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM orders WHERE id=$1", [Number(req.body.id)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Supprimer TOUTES les commandes (admin)
+app.post("/api/orders/clear", async (_req, res) => {
+  try {
+    await pool.query("DELETE FROM orders");
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// Modifier une commande (admin — statut / note)
+app.post("/api/orders/update", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const id = Number(b.id);
+    if (!id) return res.status(400).json({ error: "id manquant" });
+    await pool.query(
+      `UPDATE orders SET client_name=$1, client_phone=$2, delivery=$3, total=$4, pay_method=$5, pay_num=$6 WHERE id=$7`,
+      [b.name||"", b.phone||"", b.delivery||"", Number(b.total)||0, b.payMethod||"", b.payNum||"", id]
+    );
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 
@@ -747,6 +808,209 @@ app.post("/api/admin/import/json", upload.single("file"), async (req, res) => {
     }
 
     res.json({ ok: true, imported: report });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── Import Excel ─────────────────────────────────────────────────────────────
+app.post("/api/admin/import/excel", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Fichier manquant" });
+    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    const report = {};
+
+    function sheetToRows(name) {
+      if (!wb.SheetNames.includes(name)) return [];
+      return XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: "" });
+    }
+
+    // users
+    const users = sheetToRows("users");
+    if (users.length) {
+      let n = 0;
+      for (const u of users) {
+        if (!u.id) continue;
+        await pool.query(`
+          INSERT INTO users (id,pwd,name,phone,role,approved,subscription_until,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          ON CONFLICT (id) DO UPDATE SET
+            pwd=EXCLUDED.pwd, name=EXCLUDED.name, phone=EXCLUDED.phone,
+            role=EXCLUDED.role, approved=EXCLUDED.approved,
+            subscription_until=EXCLUDED.subscription_until
+        `, [u.id, u.pwd||"", u.name||"", u.phone||"", u.role||"vendeur",
+            u.approved === true || u.approved === "true" || u.approved === 1,
+            u.subscription_until||null, u.created_at||new Date()]);
+        n++;
+      }
+      report.users = n;
+    }
+
+    // products
+    const products = sheetToRows("products");
+    if (products.length) {
+      let n = 0;
+      for (const p of products) {
+        if (!p.id) continue;
+        const imgVal = typeof p.image === "string" && p.image.startsWith("[IMAGE") ? null : (p.image || null);
+        await pool.query(`
+          INSERT INTO products
+            (id,title,description,price,old_price,category,image,stock,stock_init,
+             owner_id,owner_name,owner_role,whatsapp,personal_phone,approved,blocked,
+             employer,job_location,contract_type,salary,deadline,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+          ON CONFLICT (id) DO UPDATE SET
+            title=EXCLUDED.title, description=EXCLUDED.description, price=EXCLUDED.price,
+            old_price=EXCLUDED.old_price, category=EXCLUDED.category,
+            stock=EXCLUDED.stock, approved=EXCLUDED.approved, blocked=EXCLUDED.blocked
+        `, [
+          p.id, p.title||"", p.description||"",
+          Number(p.price)||0, p.old_price ? Number(p.old_price) : null,
+          p.category||"", imgVal,
+          Number(p.stock)||0, Number(p.stock_init||p.stock)||0,
+          p.owner_id||"", p.owner_name||"", p.owner_role||"vendeur",
+          p.whatsapp||"", p.personal_phone||"",
+          p.approved === true || p.approved === "true" || p.approved === 1,
+          p.blocked === true || p.blocked === "true" || p.blocked === 1,
+          p.employer||"", p.job_location||"", p.contract_type||"",
+          p.salary||"", p.deadline||"", p.created_at||new Date()
+        ]);
+        n++;
+      }
+      report.products = n;
+    }
+
+    // orders
+    const orders = sheetToRows("orders");
+    if (orders.length) {
+      let n = 0;
+      for (const o of orders) {
+        if (!o.id) continue;
+        let items = o.items || "[]";
+        if (typeof items === "string") { try { JSON.parse(items); } catch { items = "[]"; } }
+        else items = JSON.stringify(items);
+        await pool.query(`
+          INSERT INTO orders (id,order_no,client_name,client_phone,delivery,items,total,pay_method,pay_num,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          ON CONFLICT (id) DO NOTHING
+        `, [o.id, o.order_no||"", o.client_name||"", o.client_phone||"",
+            o.delivery||"", items, Number(o.total)||0,
+            o.pay_method||"", o.pay_num||"", o.created_at||new Date()]);
+        n++;
+      }
+      report.orders = n;
+    }
+
+    // rencontres
+    const rencontres = sheetToRows("rencontres");
+    if (rencontres.length) {
+      let n = 0;
+      for (const r of rencontres) {
+        if (!r.id) continue;
+        const photoVal = typeof r.photo === "string" && r.photo.startsWith("[IMAGE") ? null : (r.photo || null);
+        await pool.query(`
+          INSERT INTO rencontres (id,nom,prenom,birthdate,profession,ville,quartier,sexe,whatsapp,phone,photo,description,sous_cat,prix_acces,approved,created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          ON CONFLICT (id) DO UPDATE SET
+            approved=EXCLUDED.approved, profession=EXCLUDED.profession,
+            description=EXCLUDED.description, prix_acces=EXCLUDED.prix_acces
+        `, [r.id, r.nom||"", r.prenom||"", r.birthdate||null,
+            r.profession||"", r.ville||"", r.quartier||"", r.sexe||"",
+            r.whatsapp||"", r.phone||"", photoVal, r.description||"",
+            r.sous_cat||"amitie", Number(r.prix_acces)||500,
+            r.approved === true || r.approved === "true" || r.approved === 1,
+            r.created_at||new Date()]);
+        n++;
+      }
+      report.rencontres = n;
+    }
+
+    // settings
+    const settingsRows = sheetToRows("settings");
+    if (settingsRows.length) {
+      const s = settingsRows[0];
+      let smsConfig = s.sms_config;
+      if (typeof smsConfig === "string") { try { smsConfig = JSON.parse(smsConfig); } catch { smsConfig = null; } }
+      await pool.query(`
+        UPDATE settings SET
+          company_name=COALESCE($1, company_name),
+          subscription_price=COALESCE($2, subscription_price),
+          sms_config=COALESCE($3, sms_config),
+          company_phone=COALESCE($4, company_phone),
+          company_email=COALESCE($5, company_email),
+          company_website=COALESCE($6, company_website)
+        WHERE id=1
+      `, [s.company_name||null, s.subscription_price||null,
+          smsConfig ? JSON.stringify(smsConfig) : null,
+          s.company_phone||null, s.company_email||null, s.company_website||null]);
+      report.settings = 1;
+    }
+
+    res.json({ ok: true, imported: report });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── Surveillance espace base de données ─────────────────────────────────────
+// Render.com PostgreSQL gratuit = 1 Go (1 073 741 824 octets)
+const RENDER_FREE_DB_LIMIT_BYTES = 1073741824;
+app.get("/api/admin/db-size", async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT pg_database_size(current_database()) AS size_bytes");
+    const sizeBytes = Number(rows[0].size_bytes);
+    const limitBytes = RENDER_FREE_DB_LIMIT_BYTES;
+    const pct = (sizeBytes / limitBytes) * 100;
+    const sizeMB = (sizeBytes / 1048576).toFixed(2);
+    const limitMB = (limitBytes / 1048576).toFixed(0);
+    res.json({
+      sizeBytes,
+      limitBytes,
+      sizeMB: Number(sizeMB),
+      limitMB: Number(limitMB),
+      pct: Number(pct.toFixed(2)),
+      alert: pct >= 90,
+      warning: pct >= 75,
+    });
+  } catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+// ─── Export ZIP de déploiement (sans fichiers spécifiques à l'IDE) ────────────
+app.get("/api/admin/export/zip", async (req, res) => {
+  try {
+    const AdmZip = require("adm-zip");
+    const fs = require("fs");
+    const zip = new AdmZip();
+
+    // Générer le fichier .env.example dynamiquement
+    const envExample = [
+      "# Variables d'environnement requises pour ABENGOUROU-MARKET",
+      "# Renommez ce fichier en .env avant de démarrer",
+      "",
+      "# URL de connexion PostgreSQL (obligatoire)",
+      "DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME",
+      "",
+      "# Identifiants administrateur (optionnel — défaut : buzz / arrow)",
+      "ADMIN_ID=buzz",
+      "ADMIN_PWD=arrow",
+      "",
+      "# Port du serveur (optionnel — défaut : 5000)",
+      "PORT=5000",
+    ].join("\n");
+    zip.addFile(".env.example", Buffer.from(envExample, "utf8"));
+
+    // Fichiers racine à inclure (sans fichiers spécifiques à l'IDE)
+    const filesToInclude = ["server.js", "package.json", "package-lock.json", "README.md"];
+    for (const f of filesToInclude) {
+      const fp = path.join(__dirname, f);
+      if (fs.existsSync(fp)) zip.addLocalFile(fp);
+    }
+
+    // Dossier public/ complet (HTML, CSS, JS, images)
+    const publicDir = path.join(__dirname, "public");
+    if (fs.existsSync(publicDir)) zip.addLocalFolder(publicDir, "public");
+
+    const buf = zip.toBuffer();
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="amzon.zip"`);
+    res.send(buf);
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 

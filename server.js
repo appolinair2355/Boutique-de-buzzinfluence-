@@ -14,11 +14,13 @@ const ADMIN_ID  = process.env.ADMIN_ID  || "buzz";
 const ADMIN_PWD = process.env.ADMIN_PWD || "arrow";
 
 // ─── Connexion PostgreSQL ────────────────────────────────────────────────────
+const dbUrl = process.env.DATABASE_URL ||
+  "postgresql://boutique_en_ligne_user:28HKostTV7XpwU2nVso0cKbQwd1avOBn@dpg-d8pq2337uimc73aedqog-a.oregon-postgres.render.com/boutique_en_ligne";
+
+const isLocalDB = dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes("render.com")
-    ? { rejectUnauthorized: false }
-    : false,
+  connectionString: dbUrl,
+  ssl: isLocalDB ? false : { rejectUnauthorized: false },
 });
 
 // ─── Création des tables au démarrage ───────────────────────────────────────

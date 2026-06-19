@@ -38,7 +38,14 @@ const BANNERS = [
 ];
 
 
-const RENCONTRES_WA = "2250767202271"; // WhatsApp fixe pour Rencontres & Amitiés
+let RENCONTRES_WA = "2250767202271"; // WhatsApp admin pour Rencontres & Amitiés (mis à jour depuis les paramètres)
+// Charger le WhatsApp admin depuis les paramètres du serveur
+(async () => {
+  try {
+    const s = await (await fetch("/api/settings")).json();
+    if (s.companyWhatsapp) RENCONTRES_WA = String(s.companyWhatsapp).replace(/\D/g, "");
+  } catch {}
+})();
 const fmt = n => Number(n).toLocaleString("fr-FR") + " FCFA";
 
 // Validation numéro Côte d'Ivoire : +225 suivi de 10 chiffres, ou local 0XXXXXXXXX
@@ -254,7 +261,7 @@ function productCard(p, isFlash = false) {
       ${p.oldPrice ? `<div class="pcard-oldprice">${fmt(p.oldPrice)}</div>` : ""}
       ${isFlash && p.stock > 0 ? `<div class="stock-bar"><span style="width:${pct}%"></span></div><div class="pcard-stock">${p.stock} restants</div>` : (!isFlash && p.stock > 0 ? `<div class="pcard-stock">${p.stock} en stock</div>` : "")}
       <div class="pcard-actions">
-        <button class="btn-add" onclick='event.stopPropagation();addCart(${JSON.stringify({id:p.id,name,price:p.price,emoji:p.emoji||"🛍️"})})'>+ Panier</button>
+        <button class="btn-add" onclick='event.stopPropagation();addCart(${JSON.stringify({id:p.id,name,price:p.price,emoji:p.emoji||"🛍️",whatsapp:wa})})'>+ Panier</button>
         ${wa ? `<button class="btn-wa" onclick="event.stopPropagation();window.open('https://wa.me/${wa}?text='+encodeURIComponent('Bonjour, article: ${name.replace(/'/g,"")}'))">W</button>` : ""}
       </div>
     </div>
@@ -277,7 +284,7 @@ function openProductDetail(p) {
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="closeModal()">Fermer</button>
       ${wa ? `<button class="btn btn-secondary" onclick="window.open('https://wa.me/${wa}?text='+encodeURIComponent('Bonjour, je suis intéressé par : ${p.name.replace(/'/g,"")}'))">💬 WhatsApp</button>` : ""}
-      <button class="btn btn-primary" onclick='addCart(${JSON.stringify({id:p.id,name:p.name,price:p.price,emoji:p.emoji||"🛍️"})});closeModal()'>+ Panier</button>
+      <button class="btn btn-primary" onclick='addCart(${JSON.stringify({id:p.id,name:p.name,price:p.price,emoji:p.emoji||"🛍️",whatsapp:wa})});closeModal()'>+ Panier</button>
     </div>`);
 }
 
@@ -576,7 +583,7 @@ async function loadTransportSection() {
       <h4>${p.title}</h4>
       <p style="font-size:12px;color:var(--muted);margin-top:4px">${p.description||""}</p>
       <button class="btn-add" style="display:block;width:100%;margin-top:12px;border-radius:20px"
-        onclick='addCart({id:${p.id},name:"${p.title.replace(/"/g,"&quot;")}",price:${p.price},emoji:"🚕"})'>Commander</button>
+        onclick='addCart({id:${p.id},name:"${p.title.replace(/"/g,"&quot;")}",price:${p.price},emoji:"🚕",whatsapp:"${(p.whatsapp||"").replace(/\D/g,"")}"})'>Commander</button>
     </div>`).join("");
 }
 
@@ -808,6 +815,21 @@ function removeItem(i) { CART.splice(i, 1); saveCart(); openCart(); }
 
 // ============ CHECKOUT ============
 function startCheckout() {
+  // Démarrer la géolocalisation en arrière-plan dès maintenant
+  CHECKOUT = {};
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        CHECKOUT._gpsReady = true;
+        CHECKOUT.location = `${lat},${lng}`;
+        CHECKOUT.mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+      },
+      () => { CHECKOUT._gpsFailed = true; },
+      { timeout: 12000, maximumAge: 60000, enableHighAccuracy: true }
+    );
+  }
   modalHTML(`
     <h2>📦 Livraison <button class="modal-close" onclick="closeModal()">✕</button></h2>
     <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Comment souhaitez-vous recevoir votre commande ?</p>
@@ -821,16 +843,17 @@ let CHECKOUT = {};
 function chooseDelivery(mode) {
   CHECKOUT.delivery = mode;
   if (mode === "agence") return askContact();
-  // Démarrage automatique de la géolocalisation
+  // Si le GPS a déjà répondu (démarré en arrière-plan dans startCheckout)
+  if (CHECKOUT._gpsReady) return askContact();
+  if (CHECKOUT._gpsFailed) return showLocationError("accès refusé ou indisponible");
+  // Sinon attendre le résultat GPS
   getLocation();
 }
 function getLocation() {
   if (!navigator.geolocation) {
-    // GPS non supporté par le navigateur
     CHECKOUT.location = "GPS non disponible";
     return askContact();
   }
-  // Affiche l'écran de chargement immédiatement
   modalHTML(`
     <h2>📍 Localisation en cours… <button class="modal-close" onclick="closeModal()">✕</button></h2>
     <div style="text-align:center;padding:30px 20px">
@@ -840,36 +863,38 @@ function getLocation() {
     </div>`);
   navigator.geolocation.getCurrentPosition(
     pos => {
-      // Succès : coordonnées récupérées
       const lat = pos.coords.latitude.toFixed(6);
       const lng = pos.coords.longitude.toFixed(6);
+      CHECKOUT._gpsReady = true;
       CHECKOUT.location = `${lat},${lng}`;
       CHECKOUT.mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
       askContact();
     },
     err => {
-      // Échec : localisation refusée ou indisponible
       const reason = err.code === 1 ? "accès refusé" : err.code === 2 ? "position indisponible" : "délai dépassé";
-      modalHTML(`
-        <h2>📍 Localisation requise <button class="modal-close" onclick="closeModal()">✕</button></h2>
-        <div style="background:#FFF3E0;border:1.5px solid #FFCC80;border-radius:var(--radius);padding:14px;margin-bottom:16px">
-          <strong style="color:var(--primary)">⚠️ Localisation ${reason}</strong>
-          <p style="font-size:13px;margin-top:6px;line-height:1.6">Pour la livraison à domicile, nous avons besoin de votre position GPS.<br>
-          Veuillez activer la localisation dans votre navigateur :</p>
-          <ul style="font-size:13px;margin:8px 0 0 16px;line-height:1.8">
-            <li><strong>Chrome :</strong> Cadenas 🔒 dans la barre d'adresse → Localisation → Autoriser</li>
-            <li><strong>Firefox :</strong> Icône d'emplacement dans la barre → Autoriser</li>
-            <li><strong>Safari :</strong> Réglages → Sites web → Localisation → Autoriser</li>
-          </ul>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <button class="btn btn-primary" onclick="getLocation()">🔄 Réessayer la localisation</button>
-          <button class="btn btn-ghost" style="font-size:13px" onclick="skipLocation()">Continuer sans localisation (entrer l'adresse manuellement)</button>
-          <button class="btn btn-ghost" onclick="startCheckout()">← Retour</button>
-        </div>`);
+      showLocationError(reason);
     },
     { timeout: 12000, maximumAge: 60000, enableHighAccuracy: true }
   );
+}
+function showLocationError(reason) {
+  modalHTML(`
+    <h2>📍 Localisation requise <button class="modal-close" onclick="closeModal()">✕</button></h2>
+    <div style="background:#FFF3E0;border:1.5px solid #FFCC80;border-radius:var(--radius);padding:14px;margin-bottom:16px">
+      <strong style="color:var(--primary)">⚠️ Localisation ${reason}</strong>
+      <p style="font-size:13px;margin-top:6px;line-height:1.6">Pour la livraison à domicile, nous avons besoin de votre position GPS.<br>
+      Veuillez activer la localisation dans votre navigateur :</p>
+      <ul style="font-size:13px;margin:8px 0 0 16px;line-height:1.8">
+        <li><strong>Chrome :</strong> Cadenas 🔒 dans la barre d'adresse → Localisation → Autoriser</li>
+        <li><strong>Firefox :</strong> Icône d'emplacement dans la barre → Autoriser</li>
+        <li><strong>Safari :</strong> Réglages → Sites web → Localisation → Autoriser</li>
+      </ul>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-primary" onclick="getLocation()">🔄 Réessayer la localisation</button>
+      <button class="btn btn-ghost" style="font-size:13px" onclick="skipLocation()">Continuer sans localisation (entrer l'adresse manuellement)</button>
+      <button class="btn btn-ghost" onclick="startCheckout()">← Retour</button>
+    </div>`);
 }
 function skipLocation() {
   CHECKOUT.location = "Adresse manuelle";
@@ -913,6 +938,11 @@ function showPayment() {
   CHECKOUT.address = document.getElementById("coAddr").value.trim();
   if (!CHECKOUT.name || !CHECKOUT.phone) return toast("Veuillez remplir nom et téléphone", "red");
   if (!isValidCIPhone(CHECKOUT.phone)) return toast("Le téléphone doit être un numéro ivoirien (+225 XXXXXXXXXX)", "red");
+  // Générer un lien Maps depuis l'adresse manuelle si pas de GPS
+  if (!CHECKOUT.mapsUrl && CHECKOUT.address) {
+    const query = encodeURIComponent(CHECKOUT.address + ", Abengourou, Côte d'Ivoire");
+    CHECKOUT.mapsUrl = `https://www.google.com/maps/search/${query}`;
+  }
   modalHTML(`
     <h2>💳 Paiement <button class="modal-close" onclick="closeModal()">✕</button></h2>
     <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Choisissez votre mode de paiement :</p>
@@ -1381,13 +1411,13 @@ async function adminTab(which) {
                 ? `<span class="status-badge status-ok">✓ Validé</span>`
                 : `<span class="status-badge status-wait">⏳ En attente</span>`;
             const img = p.image ? `<img src="${p.image}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : `<div style="width:44px;height:44px;background:#f5f5f5;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px">🛍️</div>`;
-            return `<div class="admin-row">
+            return `<div class="admin-row" id="admin-prod-${p.id}">
               <div class="admin-row-head">
                 <div style="display:flex;gap:10px;align-items:center">
                   ${img}
                   <div>
                     <div class="admin-row-name">${p.title}</div>
-                    <div class="admin-row-sub">${fmt(p.price)} · Stock: ${p.stock} · Par: ${p.ownerName} (${p.ownerRole})</div>
+                    <div class="admin-row-sub">${fmt(p.price)} · Stock: ${p.stock}/${p.stockInit||p.stock} · Par: ${p.ownerName} (${p.ownerRole})</div>
                   </div>
                 </div>
                 ${st}
@@ -1395,8 +1425,10 @@ async function adminTab(which) {
               <div class="admin-row-actions">
                 ${!p.approved ? `<button class="btn btn-secondary btn-sm" onclick="approveProduct(${p.id})">✓ Approuver</button>` : ""}
                 ${!p.blocked ? `<button class="btn btn-ghost btn-sm" onclick="blockProduct(${p.id})">🚫 Bloquer</button>` : `<button class="btn btn-secondary btn-sm" onclick="approveProduct(${p.id})">↩ Débloquer</button>`}
-                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Supprimer</button>
+                <button class="btn btn-secondary btn-sm" onclick="adminEditProductPanel(${p.id})">✏️ Modifier</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
               </div>
+              <div id="admin-edit-panel-${p.id}" style="display:none;margin-top:12px;background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:14px"></div>
             </div>`;
           }).join("")}`;
 
@@ -1422,20 +1454,28 @@ async function adminTab(which) {
         <div class="stat-card"><div class="stat-num">${orders.length}</div><div class="stat-lbl">Total commandes</div></div>
         <div class="stat-card green"><div class="stat-num">${fmt(total)}</div><div class="stat-lbl">Valeur totale</div></div>
       </div>
+      ${orders.length > 0 ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-danger btn-sm" onclick="adminClearOrders()">🗑️ Effacer toutes les commandes</button>
+      </div>` : ""}
       ${rev.length === 0
         ? `<div class="empty-state"><div class="empty-ico">📋</div><p>Aucune commande reçue.</p></div>`
         : rev.map(o => `
-          <div class="order-card">
+          <div class="order-card" id="order-card-${o.id}">
             <div class="order-head">
               <div>
                 <span class="order-num">${o.orderNo || o.id}</span>
                 <span class="delivery-badge ${o.delivery==="agence"?"delivery-agence":"delivery-home"}" style="margin-left:8px">${o.delivery==="agence"?"🏢 Retrait":"🚚 Livraison"}</span>
               </div>
-              <div class="order-meta">${new Date(o.createdAt).toLocaleString("fr-FR")}</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="order-meta">${new Date(o.createdAt).toLocaleString("fr-FR")}</div>
+                <button class="btn btn-secondary btn-sm" onclick="adminEditOrderPanel(${o.id})">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="adminDeleteOrder(${o.id})">🗑️</button>
+              </div>
             </div>
             <div class="order-meta" style="margin-top:6px">👤 ${o.name} · 📞 ${o.phone}</div>
             <div class="order-items">📦 ${(o.items||[]).map(i => `${i.qty}× ${i.name}`).join(" · ")}</div>
-            <div class="order-total">💰 Total : ${fmt(o.total)} · 💳 ${o.payMethod||"—"}</div>
+            <div class="order-total">💰 Total : ${fmt(o.total)} · 💳 ${o.payMethod||"—"} ${o.payNum?"("+o.payNum+")":""}</div>
+            <div id="order-edit-panel-${o.id}" style="display:none;margin-top:10px;background:#f9f9f9;border:1px solid #eee;border-radius:8px;padding:12px"></div>
           </div>`).join("")}`;
 
   } else if (which === "rencontres") {
@@ -1477,12 +1517,50 @@ async function adminTab(which) {
         }).join("")}`;
 
   } else if (which === "data") {
-    const stats = await (await fetch("/api/admin/db-stats")).json();
+    const [stats, dbSize] = await Promise.all([
+      fetch("/api/admin/db-stats").then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/db-size").then(r => r.json()).catch(() => null),
+    ]);
     const tableLabels = { users:"👥 Utilisateurs", products:"📦 Articles", orders:"🛒 Commandes", settings:"⚙️ Paramètres", rencontres:"❤️ Rencontres" };
+
+    // Bandeau alerte espace BD
+    let dbAlertHtml = "";
+    if (dbSize && !dbSize.error) {
+      const pct = dbSize.pct;
+      const bar  = Math.min(pct, 100).toFixed(1);
+      const used = dbSize.sizeMB < 1 ? `${(dbSize.sizeMB * 1024).toFixed(0)} Ko` : `${dbSize.sizeMB.toFixed(1)} Mo`;
+      const limit = `${dbSize.limitMB} Mo`;
+      const barColor = pct >= 90 ? "#c62828" : pct >= 75 ? "#e65100" : "#2e7d32";
+      const bgColor  = pct >= 90 ? "#ffebee" : pct >= 75 ? "#fff3e0" : "#e8f5e9";
+      const border   = pct >= 90 ? "#ef9a9a" : pct >= 75 ? "#ffcc80" : "#a5d6a7";
+      const icon     = pct >= 90 ? "🚨" : pct >= 75 ? "⚠️" : "✅";
+      const msg      = pct >= 90
+        ? `<strong>ALERTE — Base de données presque pleine !</strong> Exportez vos données en JSON immédiatement avant que la base ne soit coupée.`
+        : pct >= 75
+        ? `<strong>Attention :</strong> La base de données est aux ¾ de sa capacité. Pensez à exporter régulièrement.`
+        : `Base de données en bonne santé.`;
+      dbAlertHtml = `
+        <div style="background:${bgColor};border:1.5px solid ${border};border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:22px">${icon}</span>
+            <div style="flex:1">
+              <div style="font-size:14px;color:${barColor}">${msg}</div>
+              <div style="font-size:12px;color:#555;margin-top:3px">Utilisé : <strong>${used}</strong> sur <strong>${limit}</strong> (${pct.toFixed(1)}%)</div>
+            </div>
+          </div>
+          <div style="background:#ddd;border-radius:6px;height:10px;overflow:hidden">
+            <div style="width:${bar}%;background:${barColor};height:100%;border-radius:6px;transition:width .6s"></div>
+          </div>
+          ${pct >= 90 ? `<div style="margin-top:10px"><a href="/api/admin/export/json" class="btn btn-danger btn-sm" download>⬇️ Exporter JSON maintenant</a></div>` : ""}
+        </div>`;
+    }
+
     c.innerHTML = `
       <div class="db-panel">
         <h3 class="db-title">🗄️ Gestion de la Base de Données</h3>
         <p class="db-subtitle">Exportez, sauvegardez ou restaurez toutes les données du marketplace.</p>
+
+        ${dbAlertHtml}
 
         <!-- STATS -->
         <div class="db-stats-grid">
@@ -1516,21 +1594,33 @@ async function adminTab(which) {
           </div>
         </div>
 
+        <!-- EXPORT ZIP -->
+        <div class="db-section">
+          <div class="db-section-title">📦 Télécharger le projet (déploiement)</div>
+          <p class="db-section-desc">Téléchargez un fichier ZIP contenant tous les fichiers du projet pour le déployer sur un autre serveur.</p>
+          <div class="db-actions">
+            <a href="/api/admin/export/zip" class="btn btn-primary db-btn" download>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              📦 Télécharger le ZIP de déploiement
+            </a>
+          </div>
+        </div>
+
         <!-- IMPORT -->
         <div class="db-section">
-          <div class="db-section-title">📥 Importer des données (JSON)</div>
-          <p class="db-section-desc">Restaurez une sauvegarde JSON. Les entrées existantes sont mises à jour, les nouvelles sont ajoutées.</p>
+          <div class="db-section-title">📥 Importer des données (JSON ou Excel)</div>
+          <p class="db-section-desc">Restaurez une sauvegarde JSON ou Excel. Les entrées existantes sont mises à jour, les nouvelles sont ajoutées.</p>
           <div class="db-import-area" id="dbImportArea" onclick="document.getElementById('dbFileInput').click()">
             <div class="db-import-icon">📂</div>
-            <div class="db-import-text">Cliquez pour choisir un fichier JSON</div>
-            <div class="db-import-hint">ou glissez-déposez ici</div>
-            <input type="file" id="dbFileInput" accept=".json" style="display:none" onchange="importDbFile(this)" />
+            <div class="db-import-text">Cliquez pour choisir un fichier JSON ou Excel</div>
+            <div class="db-import-hint">Formats acceptés : .json · .xlsx — glissez-déposez ou cliquez</div>
+            <input type="file" id="dbFileInput" accept=".json,.xlsx" style="display:none" onchange="importDbFile(this)" />
           </div>
           <div id="dbImportResult"></div>
         </div>
 
         <div class="db-warn-box">
-          ⚠️ <strong>Important :</strong> L'import fonctionne par UPSERT (insertion ou mise à jour). Il ne supprime jamais de données existantes. Importez uniquement des fichiers JSON générés par ce système.
+          ⚠️ <strong>Important :</strong> L'import fonctionne par UPSERT (insertion ou mise à jour). Il ne supprime jamais de données existantes. Utilisez uniquement des fichiers générés par ce système.
         </div>
       </div>`;
 
@@ -1558,6 +1648,11 @@ async function adminTab(which) {
               <label>📞 Téléphone de contact</label>
               <input id="setPhone" value="${s.companyPhone || "+225 0767202271"}" placeholder="+225 0767202271" />
               <div class="form-hint">Affiché dans le footer et la page Contact.</div>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label>💬 WhatsApp Administrateur</label>
+              <input id="setWhatsapp" value="${s.companyWhatsapp || "2250767202271"}" placeholder="2250767202271" type="tel" />
+              <div class="form-hint">Les commandes Rencontres &amp; Amitiés sont envoyées sur ce numéro WhatsApp.</div>
             </div>
             <div class="form-group" style="margin-top:12px">
               <label>📧 E-mail de contact</label>
@@ -1655,19 +1750,21 @@ function toggleSmsFields() {
 async function importDbFileObj(file) {
   const res = document.getElementById("dbImportResult");
   if (!file) return;
-  res.innerHTML = `<div class="db-import-progress">⏳ Import en cours…</div>`;
+  const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+  const endpoint = isExcel ? "/api/admin/import/excel" : "/api/admin/import/json";
+  res.innerHTML = `<div class="db-import-progress">⏳ Import ${isExcel ? "Excel" : "JSON"} en cours…</div>`;
   const fd = new FormData();
   fd.append("file", file);
   try {
-    const r = await fetch("/api/admin/import/json", { method: "POST", body: fd });
+    const r = await fetch(endpoint, { method: "POST", body: fd });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     const lignes = Object.entries(d.imported || {}).map(([t,n]) => `<li><strong>${t}</strong> : ${n} entrée(s) traitée(s)</li>`).join("");
-    res.innerHTML = `<div class="db-import-ok">✅ Import réussi !<ul>${lignes}</ul></div>`;
+    res.innerHTML = `<div class="db-import-ok">✅ Import ${isExcel ? "Excel" : "JSON"} réussi !<ul>${lignes}</ul></div>`;
     toast("Import terminé ✓", "green");
   } catch (e) {
     res.innerHTML = `<div class="db-import-err">❌ Erreur : ${e.message}</div>`;
-    toast("Erreur lors de l'import", "");
+    toast("Erreur lors de l'import", "red");
   }
 }
 function importDbFile(input) { if (input.files[0]) importDbFileObj(input.files[0]); }
@@ -1719,12 +1816,134 @@ async function approveProduct(id) { await fetch("/api/products/approve",{method:
 async function blockProduct(id) { await fetch("/api/products/block",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Article bloqué"); adminTab("products"); }
 async function deleteProduct(id) { if(!confirm("Supprimer définitivement cet article ?"))return; await fetch("/api/products/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); toast("Article supprimé"); adminTab("products"); }
 
-async function saveSettings() {
+// ─── Modifier un article (admin) ──────────────────────────────────────────────
+async function adminEditProductPanel(id) {
+  const panel = document.getElementById("admin-edit-panel-" + id);
+  if (!panel) return;
+  if (panel.style.display !== "none") { panel.style.display = "none"; return; }
+  panel.innerHTML = "<em style='color:#999;font-size:13px'>Chargement…</em>";
+  panel.style.display = "block";
+  const all = await (await fetch("/api/products/all")).json();
+  const p = all.find(x => x.id === id);
+  if (!p) { panel.innerHTML = "<em>Article introuvable.</em>"; return; }
+  const cats = CATEGORIES.map(([s,,n]) => `<option value="${s}" ${p.category===s?"selected":""}>${n}</option>`).join("");
+  panel.innerHTML = `
+    <div style="font-weight:600;margin-bottom:10px;color:var(--primary)">✏️ Modifier l'article #${id}</div>
+    <div class="form-row">
+      <div class="form-group"><label>Titre</label><input id="ep-title-${id}" value="${(p.title||"").replace(/"/g,"&quot;")}" /></div>
+      <div class="form-group"><label>Catégorie</label><select id="ep-cat-${id}">${cats}</select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Prix (FCFA)</label><input id="ep-price-${id}" type="number" value="${p.price||0}" /></div>
+      <div class="form-group"><label>Ancien prix</label><input id="ep-oldprice-${id}" type="number" value="${p.oldPrice||""}" /></div>
+      <div class="form-group"><label>Stock disponible</label><input id="ep-stock-${id}" type="number" value="${p.stock||0}" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>N° WhatsApp</label><input id="ep-wa-${id}" value="${p.whatsapp||""}" /></div>
+      <div class="form-group"><label>N° SMS commande</label><input id="ep-phone-${id}" value="${p.personalPhone||""}" /></div>
+    </div>
+    <div class="form-group"><label>Description</label><textarea id="ep-desc-${id}" rows="3" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:14px">${p.description||""}</textarea></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-primary btn-sm" onclick="adminSaveProduct(${id})">💾 Enregistrer</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('admin-edit-panel-${id}').style.display='none'">Annuler</button>
+    </div>
+  `;
+}
+
+async function adminSaveProduct(id) {
   const body = {
-    companyName:    document.getElementById("setCompany")?.value,
-    companyPhone:   document.getElementById("setPhone")?.value,
-    companyEmail:   document.getElementById("setEmail")?.value,
-    companyWebsite: document.getElementById("setWebsite")?.value,
+    id,
+    title: document.getElementById("ep-title-"+id)?.value||"",
+    category: document.getElementById("ep-cat-"+id)?.value||"",
+    price: document.getElementById("ep-price-"+id)?.value||0,
+    oldPrice: document.getElementById("ep-oldprice-"+id)?.value||null,
+    stock: document.getElementById("ep-stock-"+id)?.value||0,
+    whatsapp: document.getElementById("ep-wa-"+id)?.value||"",
+    personalPhone: document.getElementById("ep-phone-"+id)?.value||"",
+    description: document.getElementById("ep-desc-"+id)?.value||"",
+  };
+  const r = await fetch("/api/products/update", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if (r.ok) { toast("Article modifié ✓","green"); adminTab("products"); }
+  else toast("Erreur lors de la modification","red");
+}
+
+// ─── Commandes — supprimer / effacer / modifier ───────────────────────────────
+async function adminDeleteOrder(id) {
+  if (!confirm("Supprimer cette commande définitivement ?")) return;
+  const r = await fetch("/api/orders/delete", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+  if (r.ok) {
+    const card = document.getElementById("order-card-" + id);
+    if (card) card.remove();
+    toast("Commande supprimée","");
+  } else toast("Erreur","red");
+}
+
+async function adminClearOrders() {
+  if (!confirm("Supprimer TOUTES les commandes ? Cette action est irréversible.")) return;
+  const r = await fetch("/api/orders/clear", {method:"POST"});
+  if (r.ok) { toast("Toutes les commandes ont été supprimées",""); adminTab("orders"); }
+  else toast("Erreur","red");
+}
+
+function adminEditOrderPanel(id) {
+  const panel = document.getElementById("order-edit-panel-" + id);
+  if (!panel) return;
+  if (panel.style.display !== "none") { panel.style.display = "none"; return; }
+  const card = panel.closest(".order-card");
+  const nameTxt = card.querySelector(".order-meta")?.textContent||"";
+  const totalTxt = card.querySelector(".order-total")?.textContent||"";
+  const delivBadge = card.querySelector(".delivery-badge")?.textContent||"";
+  const isHome = delivBadge.includes("Livraison");
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <div style="font-weight:600;margin-bottom:8px;color:var(--primary)">✏️ Modifier la commande</div>
+    <div class="form-row">
+      <div class="form-group"><label>Nom client</label><input id="oe-name-${id}" placeholder="Nom" /></div>
+      <div class="form-group"><label>Téléphone</label><input id="oe-phone-${id}" placeholder="225..." /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Livraison</label>
+        <select id="oe-delivery-${id}">
+          <option value="agence" ${!isHome?"selected":""}>🏢 Retrait agence</option>
+          <option value="domicile" ${isHome?"selected":""}>🚚 Livraison domicile</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Total (FCFA)</label><input id="oe-total-${id}" type="number" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Moyen de paiement</label><input id="oe-pm-${id}" placeholder="Wave, MTN..." /></div>
+      <div class="form-group"><label>N° de paiement</label><input id="oe-pn-${id}" placeholder="0700000000" /></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-primary btn-sm" onclick="adminSaveOrder(${id})">💾 Enregistrer</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('order-edit-panel-${id}').style.display='none'">Annuler</button>
+    </div>
+  `;
+}
+
+async function adminSaveOrder(id) {
+  const body = {
+    id,
+    name: document.getElementById("oe-name-"+id)?.value||"",
+    phone: document.getElementById("oe-phone-"+id)?.value||"",
+    delivery: document.getElementById("oe-delivery-"+id)?.value||"agence",
+    total: document.getElementById("oe-total-"+id)?.value||0,
+    payMethod: document.getElementById("oe-pm-"+id)?.value||"",
+    payNum: document.getElementById("oe-pn-"+id)?.value||"",
+  };
+  const r = await fetch("/api/orders/update", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if (r.ok) { toast("Commande mise à jour ✓","green"); adminTab("orders"); }
+  else toast("Erreur","red");
+}
+
+async function saveSettings() {
+  const waRaw = document.getElementById("setWhatsapp")?.value || "";
+  const body = {
+    companyName:      document.getElementById("setCompany")?.value,
+    companyPhone:     document.getElementById("setPhone")?.value,
+    companyEmail:     document.getElementById("setEmail")?.value,
+    companyWebsite:   document.getElementById("setWebsite")?.value,
+    companyWhatsapp:  waRaw.replace(/\D/g, ""),
     sms: {
       enabled: document.getElementById("smsEnabled").checked,
       url: document.getElementById("smsUrl").value,
@@ -1733,6 +1952,8 @@ async function saveSettings() {
     },
   };
   await fetch("/api/settings", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  // Mettre à jour le WhatsApp admin en mémoire
+  if (body.companyWhatsapp) RENCONTRES_WA = body.companyWhatsapp;
   // Mettre à jour le footer dynamiquement
   if (body.companyPhone) { const el = document.getElementById("footerPhone"); if(el) el.textContent = body.companyPhone; const eh = document.getElementById("headerPhone"); if(eh) eh.textContent = body.companyPhone; }
   if (body.companyEmail) { const el = document.getElementById("footerEmail"); if(el) el.textContent = body.companyEmail; }
